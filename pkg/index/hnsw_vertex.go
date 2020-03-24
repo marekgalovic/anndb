@@ -12,6 +12,7 @@ type hnswVertex struct {
     id uint64
     vector math.Vector
     level int
+    deleted uint32
     edges []hnswEdgeSet
     edgeMutexes []*sync.RWMutex
 }
@@ -21,6 +22,7 @@ func newHnswVertex(id uint64, vector math.Vector, level int) *hnswVertex {
         id: id,
         vector: vector,
         level: level,
+        deleted: 0,
     }
     vertex.setLevel(level)
 

@@ -226,6 +226,7 @@ func (this *hnsw) removeVertex(id uint64) (*hnswVertex, error) {
     if vertex, exists := m[id]; exists {
         delete(m, id);
         atomic.AddUint64(&this.len, ^uint64(0));
+        atomic.StoreUint32(&vertex.deleted, 1)
         return vertex, nil
     }
 
@@ -242,6 +243,9 @@ func (this *hnsw) greedyClosestNeighbor(query math.Vector, entrypoint *hnswVerte
 
         entrypoint.edgeMutexes[level].RLock()
         for neighbor, _ := range entrypoint.edges[level] {
+            if atomic.LoadUint32(&neighbor.deleted) == 1 {
+                continue
+            }
             if distance := this.space.Distance(query, neighbor.vector); distance < minDistance {
                 minDistance = distance
                 closestNeighbor = neighbor
@@ -279,6 +283,9 @@ func (this *hnsw) searchLevel(query math.Vector, entrypoint *hnswVertex, ef, lev
 
         candidate.edgeMutexes[level].RLock()
         for neighbor, _ := range candidate.edges[level] {
+            if atomic.LoadUint32(&neighbor.deleted) == 1 {
+                continue
+            }
             if _, exists := visitedVertices[neighbor]; exists {
                 continue
             }
@@ -328,6 +335,9 @@ func (this *hnsw) selectNeighborsHeuristic(query math.Vector, neighbors utils.Pr
 
             candidate.edgeMutexes[level].RLock()
             for neighbor, _ := range candidate.edges[level] {
+                if atomic.LoadUint32(&neighbor.deleted) == 1 {
+                    continue
+                }
                 if _, exists := existingCandidates[neighbor]; exists {
                     continue
                 }
@@ -363,6 +373,9 @@ func (this *hnsw) pruneNeighbors(vertex *hnswVertex, k, level int) {
 
     vertex.edgeMutexes[level].RLock()
     for neighbor, distance := range vertex.edges[level] {
+        if atomic.LoadUint32(&neighbor.deleted) == 1 {
+            continue
+        }
         neighborsQueue.Push(utils.NewPriorityQueueItem(distance, neighbor))
     }
     vertex.edgeMutexes[level].RUnlock()
