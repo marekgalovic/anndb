@@ -1,0 +1,16 @@
+syntax = "proto3";
+package anndb_pb;
+
+service Search {
+	rpc Search(SearchRequest) returns (stream SearchResultItem);
+}
+
+message SearchRequest {
+	repeated float query = 1;
+	uint32 k = 2;
+}
+
+message SearchResultItem {
+	uint64 id = 1;
+	float score = 2;
+}

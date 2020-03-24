@@ -51,7 +51,7 @@ func main() {
 	n := 100000
 	for i := 0; i < n; i++ {
 		if (i > 100) && (math.RandomUniform() <= 0.2) {
-			queue <- -rand.Int63n(int64(i-1))
+			queue <- -rand.Int63n(int64(i-100))
 		} else {
 			queue <- int64(i)
 		}

@@ -18,6 +18,7 @@ const VERTICES_MAP_SHARD_COUNT int = 16
 var (
     ItemNotFoundError error = errors.New("Item not found")
     ItemAlreadyExistsError error = errors.New("Item already exists")
+    EmptyIndexError error = errors.New("Index is empty")
 )
 
 type hnsw struct {
@@ -56,7 +57,6 @@ func (this *hnsw) Len() int {
 
 func (this *hnsw) Insert(id uint64, value math.Vector) error {
     var vertex *hnswVertex
-    // entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
     if (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)) == nil {
         vertex = newHnswVertex(id, value, 0)
         if err := this.storeVertex(vertex); err != nil {
@@ -129,31 +129,79 @@ func (this *hnsw) Remove(id uint64) error {
         return err
     }
 
+    currEntrypoint := atomic.LoadPointer(&this.entrypoint)
+    if (*hnswVertex)(currEntrypoint) == vertex {
+        minDistance := math.MaxFloat
+        var closestNeighbor *hnswVertex = nil
+
+        for l := vertex.level; l >= 0; l-- {
+            vertex.edgeMutexes[l].RLock()
+            for neighbor, distance := range vertex.edges[l] {
+                if distance < minDistance {
+                    minDistance = distance
+                    closestNeighbor = neighbor
+                }
+            }
+            vertex.edgeMutexes[l].RUnlock()
+
+            if closestNeighbor != nil {
+                break
+            }
+        }
+        atomic.CompareAndSwapPointer(&this.entrypoint, currEntrypoint, unsafe.Pointer(closestNeighbor))
+    }
+
     for l := vertex.level; l >= 0; l-- {
         mMax := this.config.mMax
         if l == 0 {
             mMax = this.config.mMax0
         }
 
-        vertex.edgeMutexes[l].Lock()
+        vertex.edgeMutexes[l].RLock()
+        neighbors := make([]*hnswVertex, len(vertex.edges[l]))
+        i := 0
         for neighbor, _ := range vertex.edges[l] {
-            neighbor.removeEdge(l, vertex)
+            neighbors[i] = neighbor
+            i++
         }
-        for neighbor, _ := range vertex.edges[l] {
+        vertex.edgeMutexes[l].RUnlock()
+
+        for _, neighbor := range neighbors {
+            neighbor.removeEdge(l, vertex)
             this.pruneNeighbors(neighbor, mMax, l)
         }
-        vertex.edgeMutexes[l].Unlock()
     }
 
     return nil;
 }
 
-func (this *hnsw) Search(ctx context.Context, query math.Vector) (SearchResult, error) {
-	return SearchResult{}, nil;
+func (this *hnsw) Search(ctx context.Context, query math.Vector, k uint) (SearchResult, error) {
+    entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
+    if entrypoint == nil {
+        return nil, EmptyIndexError
+    }
+
+    minDistance := this.space.Distance(query, entrypoint.vector)
+    for l := entrypoint.level; l > 0; l-- {
+        entrypoint, minDistance = this.greedyClosestNeighbor(query, entrypoint, minDistance, l)
+    }
+
+    ef := math.MaxInt(this.config.ef, int(k))
+    neighbors := this.searchLevel(query, entrypoint, ef, 0)
+    n := math.MinInt(int(k), neighbors.Len())
+
+    result := make(SearchResult, n)
+    for i := n-1; i >= 0; i-- {
+        item := neighbors.Pop()
+        result[i].Id = item.Value().(*hnswVertex).id
+        result[i].Score = item.Priority()
+    }
+	
+    return result, nil
 }
 
 func (this *hnsw) getVerticesShard(id uint64) (map[uint64]*hnswVertex, *sync.RWMutex) {
-    return  this.vertices[id % uint64(VERTICES_MAP_SHARD_COUNT)], this.verticesMu[id % uint64(VERTICES_MAP_SHARD_COUNT)]
+    return this.vertices[id % uint64(VERTICES_MAP_SHARD_COUNT)], this.verticesMu[id % uint64(VERTICES_MAP_SHARD_COUNT)]
 }
 
 func (this *hnsw) storeVertex(vertex *hnswVertex) error {
@@ -178,7 +226,6 @@ func (this *hnsw) removeVertex(id uint64) (*hnswVertex, error) {
     if vertex, exists := m[id]; exists {
         delete(m, id);
         atomic.AddUint64(&this.len, ^uint64(0));
-
         return vertex, nil
     }
 
