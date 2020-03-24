@@ -5,11 +5,12 @@ import (
     "context";
     "sync";
     "sync/atomic";
+    "unsafe";
 
     "github.com/marekgalovic/anndb/pkg/math";
     "github.com/marekgalovic/anndb/pkg/utils";
 
-    log "github.com/Sirupsen/logrus";
+    // log "github.com/sirupsen/logrus";
 )
 
 const VERTICES_MAP_SHARD_COUNT int = 16
@@ -28,7 +29,7 @@ type hnsw struct {
     vertices [VERTICES_MAP_SHARD_COUNT]map[uint64]*hnswVertex
     verticesMu [VERTICES_MAP_SHARD_COUNT]*sync.RWMutex
 
-    entrypoint *hnswVertex
+    entrypoint unsafe.Pointer
 }
 
 func NewHnsw(size uint, space Space, options ...HnswOption) *hnsw {
@@ -54,21 +55,26 @@ func (this *hnsw) Len() int {
 }
 
 func (this *hnsw) Insert(id uint64, value math.Vector) error {
-    if this.entrypoint == nil {
-        vertex := newHnswVertex(id, value, 0);
+    var vertex *hnswVertex
+    // entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
+    if (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)) == nil {
+        vertex = newHnswVertex(id, value, 0)
         if err := this.storeVertex(vertex); err != nil {
             return err
         }
-        this.entrypoint = vertex;
-        return nil;
+        if atomic.CompareAndSwapPointer(&this.entrypoint, nil, unsafe.Pointer(vertex)) {
+            return nil
+        } else {
+            vertex.setLevel(this.randomLevel())   
+        }
+    } else {
+        vertex = newHnswVertex(id, value, this.randomLevel())
+        if err := this.storeVertex(vertex); err != nil {
+            return err
+        }
     }
 
-    vertex := newHnswVertex(id, value, this.randomLevel());
-    if err := this.storeVertex(vertex); err != nil {
-        return err
-    }
-
-    entrypoint := this.entrypoint;
+    entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
     minDistance := this.space.Distance(vertex.vector, entrypoint.vector);
     for l := entrypoint.level; l > vertex.level; l-- {
         entrypoint, minDistance = this.greedyClosestNeighbor(vertex.vector, entrypoint, minDistance, l);
@@ -124,14 +130,20 @@ func (this *hnsw) Remove(id uint64) error {
     }
 
     for l := vertex.level; l >= 0; l-- {
-        vertex.edgeMutexes[l].Lock()
-        for _, neighbor := range vertex.edges[l] {
-            neighbor.removeEdge(vertex)
+        mMax := this.config.mMax
+        if l == 0 {
+            mMax = this.config.mMax0
         }
-        vertex.edgeMutexes[l].Lock()
-    }
 
-    // TODO: remove from graph
+        vertex.edgeMutexes[l].Lock()
+        for neighbor, _ := range vertex.edges[l] {
+            neighbor.removeEdge(l, vertex)
+        }
+        for neighbor, _ := range vertex.edges[l] {
+            this.pruneNeighbors(neighbor, mMax, l)
+        }
+        vertex.edgeMutexes[l].Unlock()
+    }
 
     return nil;
 }

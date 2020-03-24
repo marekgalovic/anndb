@@ -21,16 +21,20 @@ func newHnswVertex(id uint64, vector math.Vector, level int) *hnswVertex {
         id: id,
         vector: vector,
         level: level,
-        edges: make([]hnswEdgeSet, level + 1),
-        edgeMutexes: make([]*sync.RWMutex, level + 1),
     }
-
-    for i := 0; i <= level; i++ {
-        vertex.edges[i] = make(hnswEdgeSet)
-        vertex.edgeMutexes[i] = &sync.RWMutex{}
-    }
+    vertex.setLevel(level)
 
     return vertex
+}
+
+func (this *hnswVertex) setLevel(level int) {
+    this.edges = make([]hnswEdgeSet, level + 1)
+    this.edgeMutexes = make([]*sync.RWMutex, level + 1)
+
+    for i := 0; i <= level; i++ {
+        this.edges[i] = make(hnswEdgeSet)
+        this.edgeMutexes[i] = &sync.RWMutex{}
+    }
 }
 
 func (this *hnswVertex) edgesCount(level int) int {
