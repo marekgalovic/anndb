@@ -1,0 +1,16 @@
+syntax = "proto3";
+package anndb_pb;
+
+import "core.proto";
+
+service ClusterManager {
+	rpc ListNodes(EmptyMessage) returns (stream Node);
+	rpc AddNode(Node) returns (EmptyMessage);
+	rpc RemoveNode(Node) returns (EmptyMessage);
+}
+
+message Node {
+	bytes id = 1;
+	string address = 2;
+	uint32 port = 3;
+}

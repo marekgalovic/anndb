@@ -1,0 +1,13 @@
+syntax = "proto3";
+package anndb_pb;
+
+import "core.proto";
+
+service RaftTransport {
+	rpc Receive(RaftMessage) returns (EmptyMessage);
+}
+
+message RaftMessage {
+	bytes group_id = 1;
+	repeated bytes messages = 2;
+}
