@@ -39,29 +39,28 @@ func worker(ctx context.Context, index index.Index, tasks <- chan int64) {
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
+	for numThreads := 1; numThreads <= runtime.NumCPU(); numThreads++ {
+		ctx, cancel := context.WithCancel(context.Background())
 
-	idx := index.NewHnsw(32, index.NewEuclideanSpace());
-	queue := make(chan int64)
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go worker(ctx, idx, queue)
-	}
-
-	startAt := time.Now()
-	n := 100000
-	for i := 0; i < n; i++ {
-		if (i > 100) && (math.RandomUniform() <= 0.2) {
-			queue <- -rand.Int63n(int64(i-100))
-		} else {
-			queue <- int64(i)
+		idx := index.NewHnsw(32, index.NewEuclideanSpace());
+		queue := make(chan int64)
+		for i := 0; i < numThreads; i++ {
+			go worker(ctx, idx, queue)
 		}
+
+		startAt := time.Now()
+		n := 100000
+		for i := 0; i < n; i++ {
+			if (i > 100) && (math.RandomUniform() <= 0.2) {
+				queue <- -rand.Int63n(int64(i-100))
+			} else {
+				queue <- int64(i)
+			}
+		}
+
+		time.Sleep(1 * time.Second)
+		cancel()
+
+		log.Infof("[%d, %.1f],", numThreads, float64(n) / float64(time.Since(startAt).Seconds()))
 	}
-
-	time.Sleep(2 * time.Second)
-
-	expectedSize := atomic.LoadUint64(&inserts) - atomic.LoadUint64(&deletes)
-	log.Infof("Expected size: %d", expectedSize)
-	log.Infof("Size: %d", idx.Len())
-	log.Infof("OPs/s: %.2f", float64(n) / float64(time.Since(startAt).Seconds()))
-	cancel()
 }	

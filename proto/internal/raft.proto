@@ -1,6 +1,0 @@
-syntax = "proto3";
-package anndb_proto_internal;
-
-service RaftTransport {
-	
-}
