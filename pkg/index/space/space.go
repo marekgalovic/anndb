@@ -14,17 +14,18 @@ type SpaceImpl interface {
 
 type Space interface {
     Distance(math.Vector, math.Vector) float32
-    // ToProto() pb.SpaceType
 }
 
 type space struct {
     impl SpaceImpl
-    // spaceType pb.SpaceType
 }
 
 func newSpace() space {
     if cpuid.CPU.AVX() {
-        return space {impl: avxSpaceImpl{}}       
+        return space {impl: avxSpaceImpl{}}
+    }
+    if cpuid.CPU.SSE() {
+        return space {impl: sseSpaceImpl{}}
     }
 
     return space {impl: nativeSpaceImpl{}}
@@ -35,23 +36,6 @@ type euclideanSpace struct { space }
 type manhattanSpace struct { space }
 
 type cosineSpace struct { space }
-
-// func (s *space) ToProto() pb.SpaceType {
-//     return s.spaceType
-// }
-
-// func NewSpaceFromProto(spaceType pb.SpaceType) Space {
-//     switch spaceType {
-//     case pb.SpaceType_EUCLIDEAN:
-//         return NewEuclideanSpace()
-//     case pb.SpaceType_MANHATTAN:
-//         return NewManhattan()
-//     case pb.SpaceType_COSINE:
-//         return NewCosine()
-//     default:
-//         panic("Invalid space type")
-//     }
-// }
 
 func NewEuclidean() Space {
     return &euclideanSpace{newSpace()}

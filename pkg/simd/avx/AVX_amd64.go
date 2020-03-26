@@ -1,4 +1,4 @@
-package avx2
+package avx
 
 import (
 	"unsafe";
