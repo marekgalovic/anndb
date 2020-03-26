@@ -8,6 +8,7 @@ import (
     "unsafe";
 
     "github.com/marekgalovic/anndb/pkg/math";
+    "github.com/marekgalovic/anndb/pkg/index/space";
     "github.com/marekgalovic/anndb/pkg/utils";
 
     // log "github.com/sirupsen/logrus";
@@ -23,7 +24,7 @@ var (
 
 type hnsw struct {
     size uint
-    space Space
+    space space.Space
 	config hnswConfig
 
     len uint64
@@ -33,7 +34,7 @@ type hnsw struct {
     entrypoint unsafe.Pointer
 }
 
-func NewHnsw(size uint, space Space, options ...HnswOption) *hnsw {
+func NewHnsw(size uint, space space.Space, options ...HnswOption) *hnsw {
 	index := &hnsw {
         size: size,
         space: space,

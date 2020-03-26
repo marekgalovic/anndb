@@ -8,6 +8,7 @@ import (
 	"runtime";
 
 	"github.com/marekgalovic/anndb/pkg/index";
+	"github.com/marekgalovic/anndb/pkg/index/space";
 	"github.com/marekgalovic/anndb/pkg/math";
 
 	log "github.com/sirupsen/logrus";
@@ -44,7 +45,7 @@ func main() {
 	for numThreads := 16; numThreads <= runtime.NumCPU(); numThreads++ {
 		ctx, cancel := context.WithCancel(context.Background())
 
-		idx := index.NewHnsw(uint(dim), index.NewEuclideanSpace());
+		idx := index.NewHnsw(uint(dim), space.NewEuclidean());
 		queue := make(chan int64)
 		for i := 0; i < numThreads; i++ {
 			go worker(ctx, idx, queue)

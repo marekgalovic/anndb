@@ -1,4 +1,4 @@
-package index
+package space
 
 import (
     "testing";
