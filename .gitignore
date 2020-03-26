@@ -1,6 +1,5 @@
 .DS_Store
 bin/*
-cmd/raft/*
 
 # Binaries for programs and plugins
 *.exe

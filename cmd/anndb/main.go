@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	joinNodes := strings.Split(joinNodesRaw, ",")
-	raftTransport, err := raft.NewTransport(joinNodes)
+	raftTransport, err := raft.NewTransport(0x01, joinNodes)
 	if err != nil {
 		log.Fatal(err)
 	}

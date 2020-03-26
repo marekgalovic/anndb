@@ -9,9 +9,8 @@ import (
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
+	"github.com/coreos/etcd/raft/raftpb";
 	"github.com/golang/protobuf/proto";
-	// "go.etcd.io/etcd/raft";
-	"go.etcd.io/etcd/raft/raftpb";
 	log "github.com/sirupsen/logrus";
 )
 
@@ -22,6 +21,8 @@ var (
 )
 
 type raftTransport struct {
+	nodeId uint64
+
 	nodeAddresses map[uint64]string
 	nodeAddressesMu sync.RWMutex
 	nodeConns map[uint64]*grpc.ClientConn
@@ -33,8 +34,10 @@ type raftTransport struct {
 	groupsMu sync.RWMutex
 }
 
-func NewTransport(join []string) (*raftTransport, error) {
+func NewTransport(nodeId uint64, join []string) (*raftTransport, error) {
 	t := &raftTransport {
+		nodeId: nodeId,
+
 		nodeAddresses: make(map[uint64]string),
 		nodeAddressesMu: sync.RWMutex{},
 		nodeConns: make(map[uint64]*grpc.ClientConn),
@@ -49,7 +52,7 @@ func NewTransport(join []string) (*raftTransport, error) {
 	return t, nil
 }
 
-func (this *raftTransport) AddGroup(group *raftGroup) error {
+func (this *raftTransport) addGroup(group *raftGroup) error {
 	this.groupsMu.Lock()
 	defer this.groupsMu.Unlock()
 
@@ -61,7 +64,7 @@ func (this *raftTransport) AddGroup(group *raftGroup) error {
 	return nil
 }
 
-func (this *raftTransport) RemoveGroup(id uuid.UUID) error {
+func (this *raftTransport) removeGroup(id uuid.UUID) error {
 	this.groupsMu.Lock()
 	defer this.groupsMu.Unlock()
 
@@ -73,7 +76,7 @@ func (this *raftTransport) RemoveGroup(id uuid.UUID) error {
 	return nil
 }
 
-func (this *raftTransport) GetGroup(id uuid.UUID) (*raftGroup, error) {
+func (this *raftTransport) getGroup(id uuid.UUID) (*raftGroup, error) {
 	this.groupsMu.RLock()
 	defer this.groupsMu.RUnlock()
 
@@ -85,6 +88,26 @@ func (this *raftTransport) GetGroup(id uuid.UUID) (*raftGroup, error) {
 }
 
 func (this *raftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*pb.EmptyMessage, error) {
+	groupId, err := uuid.FromBytes(req.GetGroupId())
+	if err != nil {
+		return nil, err
+	}
+	group, err := this.getGroup(groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]raftpb.Message, len(req.GetMessages()))
+	for i, msgBytes := range req.GetMessages() {
+		if err := proto.Unmarshal(msgBytes, &messages[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := group.receive(messages); err != nil {
+		return nil, err
+	}
+
 	return &pb.EmptyMessage{}, nil
 }
 

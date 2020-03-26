@@ -13,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus";
 )
 
+const dim int = 512
+
 var inserts uint64 = 0
 var deletes uint64 = 0
 
@@ -22,7 +24,7 @@ func worker(ctx context.Context, index index.Index, tasks <- chan int64) {
 		select {
 		case id := <- tasks:
 			if id >= 0 {
-				err = index.Insert(uint64(id), math.RandomUniformVector(32))
+				err = index.Insert(uint64(id), math.RandomUniformVector(dim))
 				if err == nil {
 					atomic.AddUint64(&inserts, 1)
 				}
@@ -39,10 +41,10 @@ func worker(ctx context.Context, index index.Index, tasks <- chan int64) {
 }
 
 func main() {
-	for numThreads := 1; numThreads <= runtime.NumCPU(); numThreads++ {
+	for numThreads := 16; numThreads <= runtime.NumCPU(); numThreads++ {
 		ctx, cancel := context.WithCancel(context.Background())
 
-		idx := index.NewHnsw(32, index.NewEuclideanSpace());
+		idx := index.NewHnsw(uint(dim), index.NewEuclideanSpace());
 		queue := make(chan int64)
 		for i := 0; i < numThreads; i++ {
 			go worker(ctx, idx, queue)

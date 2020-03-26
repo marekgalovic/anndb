@@ -1,8 +1,8 @@
 package index
 
 import (
-    "github.com/marekgalovic/anndb/pkg/math"
-    // pb "github.com/marekgalovic/tau/pkg/protobuf";
+    "github.com/marekgalovic/anndb/pkg/math";
+    "github.com/marekgalovic/anndb/pkg/simd/avx2";
 )
 
 type Space interface {
@@ -42,7 +42,8 @@ func NewEuclideanSpace() Space {
 }
 
 func (s *euclideanSpace) Distance(a, b math.Vector) float32 {
-    return EuclideanDistance(a, b)
+    return avx2.EuclideanDistance(a, b)
+    // return EuclideanDistance(a, b)
 }
 
 func EuclideanDistance(a, b math.Vector) float32 {
@@ -59,7 +60,8 @@ func NewManhattanSpace() Space {
 }
 
 func (s *manhattanSpace) Distance(a, b math.Vector) float32 {
-    return ManhattanDistance(a, b)
+    return avx2.ManhattanDistance(a, b)
+    // return ManhattanDistance(a, b)
 }
 
 func ManhattanDistance(a, b math.Vector) float32 {
