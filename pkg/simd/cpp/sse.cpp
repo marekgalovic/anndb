@@ -8,7 +8,7 @@ void _sum_vector(__m128 vec, float *result) {
 void euclidean_distance_squared(size_t len, float *a, float *b, float *result) {
 	__m128 v1, v2;
 	__m128 resVec = _mm_setzero_ps();
-	for (int i = 0; i < len; i += 8) {
+	for (int i = 0; i < len; i += 4) {
 		v1 = _mm_load_ps(&a[i]);
 		v2 = _mm_load_ps(&b[i]);
 		v1 = _mm_sub_ps(v1, v2);
@@ -22,7 +22,7 @@ void euclidean_distance_squared(size_t len, float *a, float *b, float *result) {
 void manhattan_distance(size_t len, float *a, float *b, float *result) {
 	__m128 v1, v2;
 	__m128 resVec = _mm_setzero_ps();
-	for (int i = 0; i < len; i += 8) {
+	for (int i = 0; i < len; i += 4) {
 		v1 = _mm_load_ps(&a[i]);
 		v2 = _mm_load_ps(&b[i]);
 		v1 = _mm_sub_ps(v1, v2);
@@ -39,7 +39,7 @@ void cosine_similarity_dot_norm(size_t len, float *a, float *b, float *result_do
 	dot = _mm_setzero_ps();
 	norm_a = _mm_setzero_ps();
 	norm_b = _mm_setzero_ps();
-	for (int i = 0; i < len; i += 8) {
+	for (int i = 0; i < len; i += 4) {
 		v1 = _mm_load_ps(&a[i]);
 		v2 = _mm_load_ps(&b[i]);
 		dot = _mm_add_ps(dot, _mm_mul_ps(v1, v2));

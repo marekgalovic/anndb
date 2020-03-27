@@ -13,10 +13,10 @@ __Z26euclidean_distance_squaredmPfS_S_: ## @_Z26euclidean_distance_squaredmPfS_S
 ## %bb.2:
 	dec	rdi
 	mov	r9, rdi
-	shr	r9, 3
+	shr	r9, 2
 	lea	r8d, [r9 + 1]
 	and	r8d, 3
-	cmp	rdi, 24
+	cmp	rdi, 12
 	jae	LBB0_8
 ## %bb.3:
 	xorps	xmm0, xmm0
@@ -35,22 +35,22 @@ LBB0_8:
 	.p2align	4, 0x90
 LBB0_9:                                 ## =>This Inner Loop Header: Depth=1
 	movaps	xmm2, xmmword ptr [rsi + 4*rdi]
-	movaps	xmm3, xmmword ptr [rsi + 4*rdi + 32]
-	movaps	xmm4, xmmword ptr [rsi + 4*rdi + 64]
-	movaps	xmm0, xmmword ptr [rsi + 4*rdi + 96]
+	movaps	xmm3, xmmword ptr [rsi + 4*rdi + 16]
+	movaps	xmm4, xmmword ptr [rsi + 4*rdi + 32]
+	movaps	xmm0, xmmword ptr [rsi + 4*rdi + 48]
 	subps	xmm2, xmmword ptr [rdx + 4*rdi]
 	mulps	xmm2, xmm2
 	addps	xmm2, xmm1
-	subps	xmm3, xmmword ptr [rdx + 4*rdi + 32]
+	subps	xmm3, xmmword ptr [rdx + 4*rdi + 16]
 	mulps	xmm3, xmm3
 	addps	xmm3, xmm2
-	subps	xmm4, xmmword ptr [rdx + 4*rdi + 64]
+	subps	xmm4, xmmword ptr [rdx + 4*rdi + 32]
 	mulps	xmm4, xmm4
 	addps	xmm4, xmm3
-	subps	xmm0, xmmword ptr [rdx + 4*rdi + 96]
+	subps	xmm0, xmmword ptr [rdx + 4*rdi + 48]
 	mulps	xmm0, xmm0
 	addps	xmm0, xmm4
-	add	rdi, 32
+	add	rdi, 16
 	movaps	xmm1, xmm0
 	add	rax, 4
 	jne	LBB0_9
@@ -66,7 +66,7 @@ LBB0_6:                                 ## =>This Inner Loop Header: Depth=1
 	subps	xmm1, xmmword ptr [rdx + rdi]
 	mulps	xmm1, xmm1
 	addps	xmm0, xmm1
-	add	rdi, 32
+	add	rdi, 16
 	inc	r8
 	jne	LBB0_6
 LBB0_7:
@@ -93,7 +93,7 @@ __Z18manhattan_distancemPfS_S_:         ## @_Z18manhattan_distancemPfS_S_
 	je	LBB1_1
 ## %bb.2:
 	dec	rdi
-	shr	rdi, 3
+	shr	rdi, 2
 	lea	r8d, [rdi + 1]
 	and	r8d, 1
 	test	rdi, rdi
@@ -106,16 +106,16 @@ __Z18manhattan_distancemPfS_S_:         ## @_Z18manhattan_distancemPfS_S_
 	.p2align	4, 0x90
 LBB1_8:                                 ## =>This Inner Loop Header: Depth=1
 	movaps	xmm1, xmmword ptr [rsi + 4*rdi]
-	movaps	xmm2, xmmword ptr [rsi + 4*rdi + 32]
+	movaps	xmm2, xmmword ptr [rsi + 4*rdi + 16]
 	subps	xmm1, xmmword ptr [rdx + 4*rdi]
 	mulps	xmm1, xmm1
 	sqrtps	xmm1, xmm1
 	addps	xmm1, xmm0
-	subps	xmm2, xmmword ptr [rdx + 4*rdi + 32]
+	subps	xmm2, xmmword ptr [rdx + 4*rdi + 16]
 	mulps	xmm2, xmm2
 	sqrtps	xmm0, xmm2
 	addps	xmm0, xmm1
-	add	rdi, 16
+	add	rdi, 8
 	add	rax, 2
 	jne	LBB1_8
 ## %bb.4:
@@ -160,7 +160,7 @@ __Z26cosine_similarity_dot_normmPfS_S_S_: ## @_Z26cosine_similarity_dot_normmPfS
 	je	LBB2_1
 ## %bb.2:
 	dec	rdi
-	shr	rdi, 3
+	shr	rdi, 2
 	lea	r9d, [rdi + 1]
 	and	r9d, 1
 	test	rdi, rdi
@@ -175,9 +175,9 @@ __Z26cosine_similarity_dot_normmPfS_S_S_: ## @_Z26cosine_similarity_dot_normmPfS
 	.p2align	4, 0x90
 LBB2_8:                                 ## =>This Inner Loop Header: Depth=1
 	movaps	xmm5, xmmword ptr [rsi + 4*rdi]
-	movaps	xmm1, xmmword ptr [rsi + 4*rdi + 32]
+	movaps	xmm1, xmmword ptr [rsi + 4*rdi + 16]
 	movaps	xmm6, xmmword ptr [rdx + 4*rdi]
-	movaps	xmm0, xmmword ptr [rdx + 4*rdi + 32]
+	movaps	xmm0, xmmword ptr [rdx + 4*rdi + 16]
 	movaps	xmm7, xmm5
 	mulps	xmm7, xmm6
 	addps	xmm7, xmm2
@@ -192,7 +192,7 @@ LBB2_8:                                 ## =>This Inner Loop Header: Depth=1
 	addps	xmm1, xmm5
 	mulps	xmm0, xmm0
 	addps	xmm0, xmm6
-	add	rdi, 16
+	add	rdi, 8
 	movaps	xmm3, xmm0
 	movaps	xmm4, xmm1
 	add	rax, 2
