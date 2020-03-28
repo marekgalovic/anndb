@@ -6,6 +6,7 @@ import (
 	"io";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/storage/wal";
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
@@ -21,10 +22,10 @@ type raftGroup struct {
 	ctxCancel context.CancelFunc
 
 	raft etcdRaft.Node
-	wal *etcdRaft.MemoryStorage
+	wal wal.WAL
 }
 
-func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage *etcdRaft.MemoryStorage, transport *raftTransport) (*raftGroup, error) {
+func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *raftTransport) (*raftGroup, error) {
 	logger := log.WithFields(log.Fields{
     	"raft_node_id": transport.nodeId,
     	"raft_group_id": id.String(),
@@ -125,8 +126,8 @@ func (this *raftGroup) run() {
 		case <- ticker.C:
 			this.raft.Tick()
 		case rd := <- this.raft.Ready():
-			if err := this.saveToStorage(rd.HardState, rd.Entries); err != nil {
-				log.Error(err)
+			if err := this.wal.Save(rd.HardState, rd.Entries, rd.Snapshot); err != nil {
+				log.Fatal(err)
 				continue
 			}
 			this.transport.Send(this.ctx, this, rd.Messages);
@@ -173,14 +174,7 @@ func (this *raftGroup) reportSnapshot(nodeId uint64, status etcdRaft.SnapshotSta
 	this.raft.ReportSnapshot(nodeId, status)
 }
 
-func (this *raftGroup) saveToStorage(hardState raftpb.HardState, entries []raftpb.Entry) error {
-	this.wal.SetHardState(hardState)
-	this.wal.Append(entries)
-	return nil
-}
-
 func (this *raftGroup) processSnapshot(snapshot raftpb.Snapshot) error {
-	this.wal.ApplySnapshot(snapshot)
 	return nil
 }
 
