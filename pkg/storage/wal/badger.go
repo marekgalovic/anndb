@@ -10,6 +10,7 @@ import (
 	etcdRaft "github.com/coreos/etcd/raft";
 	"github.com/coreos/etcd/raft/raftpb";
 	badger "github.com/dgraph-io/badger/v2";
+	log "github.com/sirupsen/logrus";
 )
 
 
@@ -50,11 +51,20 @@ func SetBadgerRaftId(db *badger.DB, id uint64) error {
 } 
 
 func NewBadgerWAL(db *badger.DB, nodeId uint64, groupId uuid.UUID) *badgerWAL {
-	return &badgerWAL{
+	wal := &badgerWAL{
 		db: db,
 		nodeId: nodeId,
 		groupId: groupId,
 	}
+
+	_, err := wal.FirstIndex();
+	if err == entryNotFoundErr {
+		wal.reset(make([]raftpb.Entry, 1))
+	} else if err != nil {
+		log.Fatal(err)
+	}
+
+	return wal
 }
 
 func (this *badgerWAL) InitialState() (raftpb.HardState, raftpb.ConfState, error) {
@@ -395,4 +405,26 @@ func (this *badgerWAL) deleteKeys(batch *badger.WriteBatch, keys [][]byte) error
 	}
 
 	return nil
+}
+
+func (this *badgerWAL) reset(entries []raftpb.Entry) error {
+	batch := this.db.NewWriteBatch()
+	defer batch.Cancel()
+
+	if err := this.deleteEntriesFromIndex(batch, 0); err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		entryData, err := entry.Marshal()
+		if err != nil {
+			return err
+		}
+		err = batch.Set(this.entryKey(entry.Index), entryData)
+		if err != nil {
+			return err
+		}
+	}
+
+	return batch.Flush()
 }
