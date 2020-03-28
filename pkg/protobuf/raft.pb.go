@@ -24,6 +24,53 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
+type RaftNode struct {
+	Id                   uint64   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Address              string   `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *RaftNode) Reset()         { *m = RaftNode{} }
+func (m *RaftNode) String() string { return proto.CompactTextString(m) }
+func (*RaftNode) ProtoMessage()    {}
+func (*RaftNode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b042552c306ae59b, []int{0}
+}
+
+func (m *RaftNode) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RaftNode.Unmarshal(m, b)
+}
+func (m *RaftNode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RaftNode.Marshal(b, m, deterministic)
+}
+func (m *RaftNode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RaftNode.Merge(m, src)
+}
+func (m *RaftNode) XXX_Size() int {
+	return xxx_messageInfo_RaftNode.Size(m)
+}
+func (m *RaftNode) XXX_DiscardUnknown() {
+	xxx_messageInfo_RaftNode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RaftNode proto.InternalMessageInfo
+
+func (m *RaftNode) GetId() uint64 {
+	if m != nil {
+		return m.Id
+	}
+	return 0
+}
+
+func (m *RaftNode) GetAddress() string {
+	if m != nil {
+		return m.Address
+	}
+	return ""
+}
+
 type RaftMessage struct {
 	GroupId              []byte   `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	Messages             [][]byte `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
@@ -36,7 +83,7 @@ func (m *RaftMessage) Reset()         { *m = RaftMessage{} }
 func (m *RaftMessage) String() string { return proto.CompactTextString(m) }
 func (*RaftMessage) ProtoMessage()    {}
 func (*RaftMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b042552c306ae59b, []int{0}
+	return fileDescriptor_b042552c306ae59b, []int{1}
 }
 
 func (m *RaftMessage) XXX_Unmarshal(b []byte) error {
@@ -71,8 +118,65 @@ func (m *RaftMessage) GetMessages() [][]byte {
 	return nil
 }
 
+type RaftJoinMessage struct {
+	NodeId               uint64   `protobuf:"varint,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	GroupId              []byte   `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Address              string   `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *RaftJoinMessage) Reset()         { *m = RaftJoinMessage{} }
+func (m *RaftJoinMessage) String() string { return proto.CompactTextString(m) }
+func (*RaftJoinMessage) ProtoMessage()    {}
+func (*RaftJoinMessage) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b042552c306ae59b, []int{2}
+}
+
+func (m *RaftJoinMessage) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RaftJoinMessage.Unmarshal(m, b)
+}
+func (m *RaftJoinMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RaftJoinMessage.Marshal(b, m, deterministic)
+}
+func (m *RaftJoinMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RaftJoinMessage.Merge(m, src)
+}
+func (m *RaftJoinMessage) XXX_Size() int {
+	return xxx_messageInfo_RaftJoinMessage.Size(m)
+}
+func (m *RaftJoinMessage) XXX_DiscardUnknown() {
+	xxx_messageInfo_RaftJoinMessage.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RaftJoinMessage proto.InternalMessageInfo
+
+func (m *RaftJoinMessage) GetNodeId() uint64 {
+	if m != nil {
+		return m.NodeId
+	}
+	return 0
+}
+
+func (m *RaftJoinMessage) GetGroupId() []byte {
+	if m != nil {
+		return m.GroupId
+	}
+	return nil
+}
+
+func (m *RaftJoinMessage) GetAddress() string {
+	if m != nil {
+		return m.Address
+	}
+	return ""
+}
+
 func init() {
+	proto.RegisterType((*RaftNode)(nil), "anndb_pb.RaftNode")
 	proto.RegisterType((*RaftMessage)(nil), "anndb_pb.RaftMessage")
+	proto.RegisterType((*RaftJoinMessage)(nil), "anndb_pb.RaftJoinMessage")
 }
 
 func init() {
@@ -80,17 +184,24 @@ func init() {
 }
 
 var fileDescriptor_b042552c306ae59b = []byte{
-	// 160 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2a, 0x4a, 0x4c, 0x2b,
-	0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x48, 0xcc, 0xcb, 0x4b, 0x49, 0x8a, 0x2f, 0x48,
-	0x92, 0xe2, 0x4a, 0xce, 0x2f, 0x4a, 0x85, 0x88, 0x2a, 0xb9, 0x70, 0x71, 0x07, 0x25, 0xa6, 0x95,
-	0xf8, 0xa6, 0x16, 0x17, 0x27, 0xa6, 0xa7, 0x0a, 0x49, 0x72, 0x71, 0xa4, 0x17, 0xe5, 0x97, 0x16,
-	0xc4, 0x67, 0xa6, 0x48, 0x30, 0x2a, 0x30, 0x6a, 0xf0, 0x04, 0xb1, 0x83, 0xf9, 0x9e, 0x29, 0x42,
-	0x52, 0x5c, 0x1c, 0xb9, 0x10, 0x55, 0xc5, 0x12, 0x4c, 0x0a, 0xcc, 0x1a, 0x3c, 0x41, 0x70, 0xbe,
-	0x91, 0x27, 0x17, 0x2f, 0xc8, 0x94, 0x90, 0xa2, 0xc4, 0xbc, 0xe2, 0x82, 0xfc, 0xa2, 0x12, 0x21,
-	0x0b, 0x2e, 0xf6, 0xa0, 0xd4, 0xe4, 0xd4, 0xcc, 0xb2, 0x54, 0x21, 0x51, 0x3d, 0x98, 0xc5, 0x7a,
-	0x48, 0x36, 0x49, 0x89, 0x21, 0x84, 0x5d, 0x73, 0x0b, 0x4a, 0x2a, 0xa1, 0xe2, 0x49, 0x6c, 0x60,
-	0x77, 0x19, 0x03, 0x02, 0x00, 0x00, 0xff, 0xff, 0x80, 0xbf, 0x6a, 0x6c, 0xbb, 0x00, 0x00, 0x00,
+	// 257 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x90, 0x31, 0x4f, 0xc3, 0x30,
+	0x10, 0x85, 0x95, 0x14, 0x35, 0xe1, 0x5a, 0x40, 0xb2, 0x04, 0xa4, 0x99, 0xaa, 0x4c, 0x99, 0x22,
+	0x04, 0x0c, 0x4c, 0x4c, 0x30, 0x14, 0x09, 0x84, 0x2c, 0xf6, 0xc8, 0xe9, 0x5d, 0xab, 0x0c, 0xf5,
+	0x59, 0xb6, 0x41, 0xe2, 0x27, 0xf0, 0xaf, 0x91, 0x5b, 0x52, 0xe2, 0xf1, 0x9d, 0x7d, 0xef, 0x7d,
+	0xf7, 0x00, 0xac, 0xda, 0xf8, 0xc6, 0x58, 0xf6, 0x2c, 0x72, 0xa5, 0x35, 0x76, 0xad, 0xe9, 0x4a,
+	0x58, 0xb3, 0xa5, 0xc3, 0xb4, 0xba, 0x87, 0x5c, 0xaa, 0x8d, 0x7f, 0x63, 0x24, 0x71, 0x0e, 0x69,
+	0x8f, 0x45, 0xb2, 0x4c, 0xea, 0x13, 0x99, 0xf6, 0x28, 0x0a, 0xc8, 0x14, 0xa2, 0x25, 0xe7, 0x8a,
+	0x74, 0x99, 0xd4, 0xa7, 0x72, 0x90, 0xd5, 0x13, 0xcc, 0xc2, 0xd6, 0x2b, 0x39, 0xa7, 0xb6, 0x24,
+	0x16, 0x90, 0x6f, 0x2d, 0x7f, 0x9a, 0xf6, 0x6f, 0x7d, 0x2e, 0xb3, 0xbd, 0x5e, 0xa1, 0x28, 0x21,
+	0xdf, 0x1d, 0x7e, 0x05, 0x93, 0x49, 0x3d, 0x97, 0x47, 0x5d, 0xb5, 0x70, 0x11, 0x5c, 0x5e, 0xb8,
+	0xd7, 0x83, 0xd3, 0x35, 0x64, 0x9a, 0x91, 0xda, 0x23, 0xc7, 0x34, 0xc8, 0x15, 0x46, 0x11, 0x69,
+	0x1c, 0x31, 0xc2, 0x9c, 0x44, 0x98, 0xb7, 0x3f, 0x09, 0x9c, 0x85, 0x84, 0x0f, 0xab, 0xb4, 0x33,
+	0x6c, 0xbd, 0x78, 0x80, 0x4c, 0xd2, 0x9a, 0xfa, 0x2f, 0x12, 0x97, 0xcd, 0x50, 0x48, 0x33, 0xba,
+	0xa5, 0xbc, 0xfa, 0x1f, 0x3f, 0xef, 0x8c, 0xff, 0x1e, 0xc8, 0x1e, 0x61, 0xf6, 0x6e, 0xd9, 0xb0,
+	0xa3, 0xc0, 0x2b, 0x16, 0xf1, 0xf6, 0xe8, 0x86, 0x52, 0xc4, 0x4f, 0xa1, 0xda, 0x9b, 0xa4, 0x9b,
+	0xee, 0xfb, 0xbe, 0xfb, 0x0d, 0x00, 0x00, 0xff, 0xff, 0x6d, 0x1b, 0x47, 0x2a, 0x93, 0x01, 0x00,
+	0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -106,6 +217,7 @@ const _ = grpc.SupportPackageIsVersion6
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type RaftTransportClient interface {
 	Receive(ctx context.Context, in *RaftMessage, opts ...grpc.CallOption) (*EmptyMessage, error)
+	ProposeJoin(ctx context.Context, in *RaftJoinMessage, opts ...grpc.CallOption) (RaftTransport_ProposeJoinClient, error)
 }
 
 type raftTransportClient struct {
@@ -125,9 +237,42 @@ func (c *raftTransportClient) Receive(ctx context.Context, in *RaftMessage, opts
 	return out, nil
 }
 
+func (c *raftTransportClient) ProposeJoin(ctx context.Context, in *RaftJoinMessage, opts ...grpc.CallOption) (RaftTransport_ProposeJoinClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_RaftTransport_serviceDesc.Streams[0], "/anndb_pb.RaftTransport/ProposeJoin", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &raftTransportProposeJoinClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type RaftTransport_ProposeJoinClient interface {
+	Recv() (*RaftNode, error)
+	grpc.ClientStream
+}
+
+type raftTransportProposeJoinClient struct {
+	grpc.ClientStream
+}
+
+func (x *raftTransportProposeJoinClient) Recv() (*RaftNode, error) {
+	m := new(RaftNode)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // RaftTransportServer is the server API for RaftTransport service.
 type RaftTransportServer interface {
 	Receive(context.Context, *RaftMessage) (*EmptyMessage, error)
+	ProposeJoin(*RaftJoinMessage, RaftTransport_ProposeJoinServer) error
 }
 
 // UnimplementedRaftTransportServer can be embedded to have forward compatible implementations.
@@ -136,6 +281,9 @@ type UnimplementedRaftTransportServer struct {
 
 func (*UnimplementedRaftTransportServer) Receive(ctx context.Context, req *RaftMessage) (*EmptyMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Receive not implemented")
+}
+func (*UnimplementedRaftTransportServer) ProposeJoin(req *RaftJoinMessage, srv RaftTransport_ProposeJoinServer) error {
+	return status.Errorf(codes.Unimplemented, "method ProposeJoin not implemented")
 }
 
 func RegisterRaftTransportServer(s *grpc.Server, srv RaftTransportServer) {
@@ -160,6 +308,27 @@ func _RaftTransport_Receive_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RaftTransport_ProposeJoin_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RaftJoinMessage)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RaftTransportServer).ProposeJoin(m, &raftTransportProposeJoinServer{stream})
+}
+
+type RaftTransport_ProposeJoinServer interface {
+	Send(*RaftNode) error
+	grpc.ServerStream
+}
+
+type raftTransportProposeJoinServer struct {
+	grpc.ServerStream
+}
+
+func (x *raftTransportProposeJoinServer) Send(m *RaftNode) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _RaftTransport_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "anndb_pb.RaftTransport",
 	HandlerType: (*RaftTransportServer)(nil),
@@ -169,6 +338,12 @@ var _RaftTransport_serviceDesc = grpc.ServiceDesc{
 			Handler:    _RaftTransport_Receive_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ProposeJoin",
+			Handler:       _RaftTransport_ProposeJoin_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "raft.proto",
 }

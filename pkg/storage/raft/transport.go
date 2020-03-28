@@ -9,6 +9,7 @@ import (
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
+	etcdRaft "github.com/coreos/etcd/raft";
 	"github.com/coreos/etcd/raft/raftpb";
 	"github.com/golang/protobuf/proto";
 	log "github.com/sirupsen/logrus";
@@ -22,6 +23,7 @@ var (
 
 type raftTransport struct {
 	nodeId uint64
+	address string
 
 	nodeAddresses map[uint64]string
 	nodeAddressesMu sync.RWMutex
@@ -34,9 +36,10 @@ type raftTransport struct {
 	groupsMu sync.RWMutex
 }
 
-func NewTransport(nodeId uint64, join []string) (*raftTransport, error) {
-	t := &raftTransport {
+func NewTransport(nodeId uint64, address string) *raftTransport {
+	return &raftTransport {
 		nodeId: nodeId,
+		address: address,
 
 		nodeAddresses: make(map[uint64]string),
 		nodeAddressesMu: sync.RWMutex{},
@@ -48,8 +51,114 @@ func NewTransport(nodeId uint64, join []string) (*raftTransport, error) {
 		groups: make(map[uuid.UUID]*raftGroup),
 		groupsMu: sync.RWMutex{},
 	}
+}
 
-	return t, nil
+func (this *raftTransport) NodeId() uint64 {
+	return this.nodeId
+}
+
+func (this *raftTransport) Address() string {
+	return this.address
+}
+
+func (this *raftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTransport_ProposeJoinServer) error {
+	groupId, err := uuid.FromBytes(req.GetGroupId())
+	if err != nil {
+		return err
+	}
+	group, err := this.getGroup(groupId)
+	if err != nil {
+		return err
+	}
+
+	if err := group.proposeJoin(req.GetNodeId(), req.GetAddress()); err != nil {
+		return err
+	}
+
+	if err := stream.Send(&pb.RaftNode{Id: this.NodeId(), Address: this.Address()}); err != nil {
+		return err
+	}
+
+	currNodes := make(map[uint64]string)
+	this.nodeAddressesMu.RLock()
+	for nodeId, address := range this.nodeAddresses {
+		currNodes[nodeId] = address
+	}
+	this.nodeAddressesMu.RUnlock()
+
+	for nodeId, address := range currNodes {
+		if err := stream.Send(&pb.RaftNode{Id: nodeId, Address: address}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+ 
+func (this *raftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*pb.EmptyMessage, error) {
+	groupId, err := uuid.FromBytes(req.GetGroupId())
+	if err != nil {
+		return nil, err
+	}
+	group, err := this.getGroup(groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]raftpb.Message, len(req.GetMessages()))
+	for i, msgBytes := range req.GetMessages() {
+		if err := proto.Unmarshal(msgBytes, &messages[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := group.receive(messages); err != nil {
+		return nil, err
+	}
+
+	return &pb.EmptyMessage{}, nil
+}
+
+func (this *raftTransport) Send(ctx context.Context, group *raftGroup, messages []raftpb.Message) {
+	for nodeId, nodeMessages := range this.groupMessagesByRecipient(&messages) {
+		payload, containsSnapshot, err := this.buildRaftMessage(group.id, nodeMessages)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+
+		client, err := this.getNodeRaftTransportClient(nodeId)
+		if err != nil {
+			log.Warn(err)
+			group.reportUnreachable(nodeId)
+			if containsSnapshot {
+				group.reportSnapshot(nodeId, etcdRaft.SnapshotFailure)
+			}
+			continue
+		}
+
+		if _, err := client.Receive(ctx, payload); err != nil {
+			// log.Warn(err)
+			group.reportUnreachable(nodeId)
+			if containsSnapshot {
+				group.reportSnapshot(nodeId, etcdRaft.SnapshotFailure)
+			}
+			continue
+		}
+
+		if containsSnapshot {
+			group.reportSnapshot(nodeId, etcdRaft.SnapshotFinish)
+		}
+	}
+}
+
+func (this *raftTransport) addNodeAddress(nodeId uint64, address string) {
+	this.nodeAddressesMu.Lock()
+	defer this.nodeAddressesMu.Unlock()
+
+	if _, exists := this.nodeAddresses[nodeId]; !exists {
+		this.nodeAddresses[nodeId] = address
+	}
 }
 
 func (this *raftTransport) addGroup(group *raftGroup) error {
@@ -87,52 +196,6 @@ func (this *raftTransport) getGroup(id uuid.UUID) (*raftGroup, error) {
 	return group, nil
 }
 
-func (this *raftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*pb.EmptyMessage, error) {
-	groupId, err := uuid.FromBytes(req.GetGroupId())
-	if err != nil {
-		return nil, err
-	}
-	group, err := this.getGroup(groupId)
-	if err != nil {
-		return nil, err
-	}
-
-	messages := make([]raftpb.Message, len(req.GetMessages()))
-	for i, msgBytes := range req.GetMessages() {
-		if err := proto.Unmarshal(msgBytes, &messages[i]); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := group.receive(messages); err != nil {
-		return nil, err
-	}
-
-	return &pb.EmptyMessage{}, nil
-}
-
-func (this *raftTransport) Send(ctx context.Context, group *raftGroup, messages []raftpb.Message) {
-	for nodeId, nodeMessages := range this.groupMessagesByRecipient(&messages) {
-		payload, err := this.buildRaftMessage(group.id, nodeMessages)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-
-		client, err := this.getNodeRaftTransportClient(nodeId)
-		if err != nil {
-			log.Warn(err)
-			group.reportUnreachable(nodeId)
-			continue
-		}
-
-		if _, err := client.Receive(ctx, payload); err != nil {
-			log.Warn(err)
-			group.reportUnreachable(nodeId)
-		}
-	}
-}
-
 func (this *raftTransport) groupMessagesByRecipient(messages *[]raftpb.Message) map[uint64][]*raftpb.Message {
 	grouped := make(map[uint64][]*raftpb.Message)
 	for _, message := range *messages {
@@ -144,20 +207,22 @@ func (this *raftTransport) groupMessagesByRecipient(messages *[]raftpb.Message) 
 	return grouped
 }
 
-func (this *raftTransport) buildRaftMessage(groupId uuid.UUID, messages []*raftpb.Message) (*pb.RaftMessage, error) {
+func (this *raftTransport) buildRaftMessage(groupId uuid.UUID, messages []*raftpb.Message) (*pb.RaftMessage, bool, error) {
 	var err error
+	var containsSnapshot bool = false
 	messageBytes := make([][]byte, len(messages))
 	for i, message := range messages {
+		containsSnapshot = containsSnapshot || (message.Type == raftpb.MsgSnap)
 		messageBytes[i], err = proto.Marshal(message)
 		if err != nil {
-			return nil, err
+			return nil, containsSnapshot, err
 		}
 	}
 
 	return &pb.RaftMessage {
 		GroupId: groupId.Bytes(),
 		Messages: messageBytes,
-	}, nil
+	}, containsSnapshot, nil
 }
 
 func (this *raftTransport) getNodeRaftTransportClient(nodeId uint64) (pb.RaftTransportClient, error) {
@@ -174,7 +239,7 @@ func (this *raftTransport) getNodeRaftTransportClient(nodeId uint64) (pb.RaftTra
 	}
 
 	this.nodeClientsMu.Lock()
-	defer this.nodeClientsMu.RUnlock()
+	defer this.nodeClientsMu.Unlock()
 
 	this.nodeClients[nodeId] = pb.NewRaftTransportClient(conn)
 	return this.nodeClients[nodeId], nil
