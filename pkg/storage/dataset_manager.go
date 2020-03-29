@@ -3,7 +3,6 @@ package storage
 import (
 	"errors";
 	"context";
-	"time";
 	"sync";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
@@ -73,14 +72,12 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 	notif := this.createdNotifications.Create(id)
 	defer func() { this.createdNotifications.Remove(id) }()
 
-	propAt := time.Now()
 	if err := this.zeroGroup.Propose(proposalData); err != nil {
 		return nil, err
 	}
 
 	select {
 	case err := <- notif:
-		log.Info(time.Since(propAt))
 		if err != nil {
 			return nil, err.(error)
 		}
@@ -103,14 +100,12 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	notif := this.deletedNotifications.Create(id)
 	defer func() { this.deletedNotifications.Remove(id) }()
 
-	propAt := time.Now()
 	if err := this.zeroGroup.Propose(proposalData); err != nil {
 		return err
 	}
 
 	select {
 	case err := <- notif:
-		log.Info(time.Since(propAt))
 		if err != nil {
 			return err.(error)
 		}
