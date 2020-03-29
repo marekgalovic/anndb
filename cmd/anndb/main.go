@@ -9,6 +9,7 @@ import (
 
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
 	"github.com/marekgalovic/anndb/pkg/storage/wal";
+	"github.com/marekgalovic/anndb/pkg/storage";
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
@@ -40,6 +41,20 @@ func main() {
 
 	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port))
 
+	// Start raft zero group
+	zeroGroup, err := raft.NewRaftGroup(uuid.Nil, getZeroNodeIds(raftTransport.NodeId(), joinNodesRaw), wal.NewBadgerWAL(db, raftNodeId, uuid.Nil), raftTransport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer zeroGroup.Stop()
+
+	datasetManager, err := storage.NewDatasetManager(zeroGroup)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Info(datasetManager)
+
 	// Start server
 	listener, err := net.Listen("tcp", net.JoinHostPort("", port))
 	if err != nil {
@@ -50,13 +65,7 @@ func main() {
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
 	go grpcServer.Serve(listener)
 
-	// Start raft zero group
-	zeroGroup, err := raft.NewRaftGroup(uuid.Nil, getZeroNodeIds(raftTransport.NodeId(), joinNodesRaw), wal.NewBadgerWAL(db, raftNodeId, uuid.Nil), raftTransport)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer zeroGroup.Stop()
-
+	// Join cluster
 	if len(joinNodesRaw) > 0 {
 		if err := zeroGroup.Join(strings.Split(joinNodesRaw, ",")); err != nil {
 			log.Fatal(err)

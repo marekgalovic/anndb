@@ -1,0 +1,31 @@
+syntax = "proto3";
+package anndb_pb;
+
+enum Space {
+	Euclidean = 0;
+	Manhattan = 1;
+	Cosine = 2;
+}
+
+message Dataset {
+	bytes id = 1;
+	uint32 dimension = 2;
+	Space space = 3;
+	uint32 partition_count = 4;
+	uint32 replication_factor = 5;
+	repeated Partition partitions = 6;
+}
+
+message Partition {
+	bytes id = 1;
+}
+
+enum DatasetsChangeType {
+	Create = 0;
+	Delete = 1;
+}
+
+message DatasetsChange {
+	DatasetsChangeType type = 1;
+	Dataset dataset = 2;
+}
