@@ -51,8 +51,48 @@ func (m *EmptyMessage) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_EmptyMessage proto.InternalMessageInfo
 
+type UUIDRequest struct {
+	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *UUIDRequest) Reset()         { *m = UUIDRequest{} }
+func (m *UUIDRequest) String() string { return proto.CompactTextString(m) }
+func (*UUIDRequest) ProtoMessage()    {}
+func (*UUIDRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f7e43720d1edc0fe, []int{1}
+}
+
+func (m *UUIDRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UUIDRequest.Unmarshal(m, b)
+}
+func (m *UUIDRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UUIDRequest.Marshal(b, m, deterministic)
+}
+func (m *UUIDRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UUIDRequest.Merge(m, src)
+}
+func (m *UUIDRequest) XXX_Size() int {
+	return xxx_messageInfo_UUIDRequest.Size(m)
+}
+func (m *UUIDRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_UUIDRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UUIDRequest proto.InternalMessageInfo
+
+func (m *UUIDRequest) GetId() []byte {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*EmptyMessage)(nil), "anndb_pb.EmptyMessage")
+	proto.RegisterType((*UUIDRequest)(nil), "anndb_pb.UUIDRequest")
 }
 
 func init() {
@@ -60,10 +100,12 @@ func init() {
 }
 
 var fileDescriptor_f7e43720d1edc0fe = []byte{
-	// 67 bytes of a gzipped FileDescriptorProto
+	// 98 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4a, 0xce, 0x2f, 0x4a,
 	0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x48, 0xcc, 0xcb, 0x4b, 0x49, 0x8a, 0x2f, 0x48,
 	0x52, 0xe2, 0xe3, 0xe2, 0x71, 0xcd, 0x2d, 0x28, 0xa9, 0xf4, 0x4d, 0x2d, 0x2e, 0x4e, 0x4c, 0x4f,
-	0x4d, 0x62, 0x03, 0x2b, 0x30, 0x06, 0x04, 0x00, 0x00, 0xff, 0xff, 0xce, 0x4d, 0x74, 0xe0, 0x2e,
-	0x00, 0x00, 0x00,
+	0x55, 0x92, 0xe5, 0xe2, 0x0e, 0x0d, 0xf5, 0x74, 0x09, 0x4a, 0x2d, 0x2c, 0x4d, 0x2d, 0x2e, 0x11,
+	0xe2, 0xe3, 0x62, 0xca, 0x4c, 0x91, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09, 0x62, 0xca, 0x4c, 0x49,
+	0x62, 0x03, 0xeb, 0x37, 0x06, 0x04, 0x00, 0x00, 0xff, 0xff, 0x19, 0xeb, 0xa3, 0xa4, 0x4d, 0x00,
+	0x00, 0x00,
 }

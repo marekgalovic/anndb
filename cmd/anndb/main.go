@@ -7,10 +7,11 @@ import (
 	"path";
 	"time";
 
+	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
 	"github.com/marekgalovic/anndb/pkg/storage/wal";
 	"github.com/marekgalovic/anndb/pkg/storage";
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/services";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
@@ -63,6 +64,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
+	pb.RegisterDatasetManagerServer(grpcServer, services.NewDatasetManagerServer(datasetManager))
 	go grpcServer.Serve(listener)
 
 	// Join cluster

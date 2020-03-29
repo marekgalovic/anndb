@@ -1,2 +1,2 @@
-# anndb
+# AnnDB
 Distributed Approximate Nearest Neighbours Database

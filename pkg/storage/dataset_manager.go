@@ -1,23 +1,42 @@
 package storage
 
 import (
+	"errors";
+	"context";
+	"time";
+	"sync";
+
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
 	log "github.com/sirupsen/logrus";
 )
 
+var (
+	DatasetNotFoundErr error = errors.New("Dataset not found")
+	DatasetAlreadyExistsErr error = errors.New("Dataset already exists")
+)
+
 type DatasetManager struct {
 	zeroGroup *raft.RaftGroup
 	datasets map[uuid.UUID]*Dataset
+	datasetsMu *sync.RWMutex
+
+	createdNotifications *utils.Notificator
+	deletedNotifications *utils.Notificator
 }
 
 func NewDatasetManager(zeroGroup *raft.RaftGroup) (*DatasetManager, error) {
 	dm := &DatasetManager {
 		zeroGroup: zeroGroup,
 		datasets: make(map[uuid.UUID]*Dataset),
+		datasetsMu: &sync.RWMutex{},
+
+		createdNotifications: utils.NewNotificator(),
+		deletedNotifications: utils.NewNotificator(),
 	}
 
 	if err := zeroGroup.RegisterProcessFn(dm.process); err != nil {
@@ -28,10 +47,20 @@ func NewDatasetManager(zeroGroup *raft.RaftGroup) (*DatasetManager, error) {
 }
 
 func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {
-	return nil, nil
+	this.datasetsMu.RLock()
+	defer this.datasetsMu.RUnlock()
+
+	if dataset, exists := this.datasets[id]; exists {
+		return dataset, nil
+	}
+
+	return nil, DatasetNotFoundErr
 }
 
-func (this *DatasetManager) Create(dataset *pb.Dataset) (*Dataset, error) {
+func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*Dataset, error) {
+	id := uuid.NewV4()
+	dataset.Id = id.Bytes()
+
 	proposal := &pb.DatasetsChange {
 		Type: pb.DatasetsChangeType_Create,
 		Dataset: dataset,
@@ -40,14 +69,55 @@ func (this *DatasetManager) Create(dataset *pb.Dataset) (*Dataset, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	notif := this.createdNotifications.Create(id)
+	defer func() { this.createdNotifications.Remove(id) }()
+
+	propAt := time.Now()
 	if err := this.zeroGroup.Propose(proposalData); err != nil {
 		return nil, err
 	}
-	return nil, nil
+
+	select {
+	case err := <- notif:
+		log.Info(time.Since(propAt))
+		if err != nil {
+			return nil, err.(error)
+		}
+		return this.Get(id)
+	case <- ctx.Done():
+		return nil, nil
+	}
 }
 
-func (this *DatasetManager) Delete(id uuid.UUID) error {
-	return nil
+func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
+	proposal := &pb.DatasetsChange {
+		Type: pb.DatasetsChangeType_Delete,
+		Dataset: &pb.Dataset {Id: id.Bytes()},
+	}
+	proposalData, err := proto.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+
+	notif := this.deletedNotifications.Create(id)
+	defer func() { this.deletedNotifications.Remove(id) }()
+
+	propAt := time.Now()
+	if err := this.zeroGroup.Propose(proposalData); err != nil {
+		return err
+	}
+
+	select {
+	case err := <- notif:
+		log.Info(time.Since(propAt))
+		if err != nil {
+			return err.(error)
+		}
+		return nil
+	case <- ctx.Done():
+		return nil
+	}
 }
 
 func (this *DatasetManager) process(data []byte) error {
@@ -56,8 +126,50 @@ func (this *DatasetManager) process(data []byte) error {
 		return err
 	}
 
-	log.Info(change.Type)
-	log.Info(change.Dataset)
+	switch change.Type {
+	case pb.DatasetsChangeType_Create:
+		return this.createDataset(change.Dataset)
+	case pb.DatasetsChangeType_Delete:
+		return this.deleteDataset(change.Dataset)
+	}
+	return nil
+}
+
+func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
+	id, err := uuid.FromBytes(dataset.GetId())
+	if err != nil {
+		return err
+	}
+
+	this.datasetsMu.Lock()
+	defer this.datasetsMu.Unlock()
+	if _, exists := this.datasets[id]; exists {
+		this.createdNotifications.Notify(id, DatasetAlreadyExistsErr)
+		return nil
+	}
+
+	this.datasets[id] = newDataset(dataset)
+	this.createdNotifications.Notify(id, nil)
+	log.Infof("Created dataset: %s", id)
+	return nil
+}
+
+func (this *DatasetManager) deleteDataset(dataset *pb.Dataset) error {
+	id, err := uuid.FromBytes(dataset.GetId())
+	if err != nil {
+		return err
+	}
+
+	this.datasetsMu.Lock()
+	defer this.datasetsMu.Unlock()
+	if _, exists := this.datasets[id]; !exists {
+		this.deletedNotifications.Notify(id, DatasetNotFoundErr)
+		return nil
+	}
+
+	delete(this.datasets, id)
+	this.deletedNotifications.Notify(id, nil)
+	log.Infof("Deleted dataset: %s", id)
 	return nil
 }
 

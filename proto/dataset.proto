@@ -1,6 +1,14 @@
 syntax = "proto3";
 package anndb_pb;
 
+import "core.proto";
+
+service DatasetManager {
+	rpc Get(UUIDRequest) returns (Dataset);
+	rpc Create(Dataset) returns (Dataset);
+	rpc Delete(UUIDRequest) returns (EmptyMessage);
+}
+
 enum Space {
 	Euclidean = 0;
 	Manhattan = 1;

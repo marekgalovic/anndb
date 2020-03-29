@@ -7,14 +7,18 @@ import (
 )
 
 type Dataset struct {
-	meta pb.Dataset
+	meta *pb.Dataset
 
 	partitions map[uuid.UUID]*partition
 }
 
-func newDataset(meta pb.Dataset) *Dataset {
+func newDataset(meta *pb.Dataset) *Dataset {
 	return &Dataset {
 		meta: meta,
 		partitions: make(map[uuid.UUID]*partition),
 	}
+}
+
+func (this *Dataset) Meta() *pb.Dataset {
+	return this.meta
 }
