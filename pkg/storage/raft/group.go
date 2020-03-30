@@ -97,8 +97,8 @@ func (this *RaftGroup) RegisterProcessFn(fn ProcessFn) error {
 	return nil
 }
 
-func (this *RaftGroup) Propose(data []byte) error {
-	return this.raft.Propose(this.ctx, data)
+func (this *RaftGroup) Propose(ctx context.Context, data []byte) error {
+	return this.raft.Propose(ctx, data)
 }
 
 func (this *RaftGroup) Join(nodes []string) error {

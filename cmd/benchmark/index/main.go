@@ -19,13 +19,13 @@ const dim int = 512
 var inserts uint64 = 0
 var deletes uint64 = 0
 
-func worker(ctx context.Context, index index.Index, tasks <- chan int64) {
+func worker(ctx context.Context, index *index.Hnsw, tasks <- chan int64) {
 	var err error
 	for {
 		select {
 		case id := <- tasks:
 			if id >= 0 {
-				err = index.Insert(uint64(id), math.RandomUniformVector(dim))
+				err = index.Insert(uint64(id), math.RandomUniformVector(dim), index.RandomLevel())
 				if err == nil {
 					atomic.AddUint64(&inserts, 1)
 				}

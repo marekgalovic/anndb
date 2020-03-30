@@ -22,7 +22,7 @@ var (
     EmptyIndexError error = errors.New("Index is empty")
 )
 
-type hnsw struct {
+type Hnsw struct {
     size uint
     space space.Space
 	config hnswConfig
@@ -34,8 +34,8 @@ type hnsw struct {
     entrypoint unsafe.Pointer
 }
 
-func NewHnsw(size uint, space space.Space, options ...HnswOption) *hnsw {
-	index := &hnsw {
+func NewHnsw(size uint, space space.Space, options ...HnswOption) *Hnsw {
+	index := &Hnsw {
         size: size,
         space: space,
 		config: newHnswConfig(options),
@@ -52,11 +52,11 @@ func NewHnsw(size uint, space space.Space, options ...HnswOption) *hnsw {
     return index
 }
 
-func (this *hnsw) Len() int {
+func (this *Hnsw) Len() int {
 	return int(atomic.LoadUint64(&this.len));
 }
 
-func (this *hnsw) Insert(id uint64, value math.Vector) error {
+func (this *Hnsw) Insert(id uint64, value math.Vector, vertexLevel int) error {
     var vertex *hnswVertex
     if (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)) == nil {
         vertex = newHnswVertex(id, value, 0)
@@ -66,10 +66,10 @@ func (this *hnsw) Insert(id uint64, value math.Vector) error {
         if atomic.CompareAndSwapPointer(&this.entrypoint, nil, unsafe.Pointer(vertex)) {
             return nil
         } else {
-            vertex.setLevel(this.randomLevel())   
+            vertex.setLevel(vertexLevel)
         }
     } else {
-        vertex = newHnswVertex(id, value, this.randomLevel())
+        vertex = newHnswVertex(id, value, vertexLevel)
         if err := this.storeVertex(vertex); err != nil {
             return err
         }
@@ -113,7 +113,7 @@ func (this *hnsw) Insert(id uint64, value math.Vector) error {
 	return nil;
 }
 
-func (this *hnsw) Get(id uint64) (math.Vector, error) {
+func (this *Hnsw) Get(id uint64) (math.Vector, error) {
     m, mu := this.getVerticesShard(id)
     defer mu.RUnlock()
     mu.RLock()
@@ -124,7 +124,7 @@ func (this *hnsw) Get(id uint64) (math.Vector, error) {
 	return nil, ItemNotFoundError
 }
 
-func (this *hnsw) Remove(id uint64) error {
+func (this *Hnsw) Remove(id uint64) error {
     vertex, err := this.removeVertex(id)
     if err != nil {
         return err
@@ -176,7 +176,7 @@ func (this *hnsw) Remove(id uint64) error {
     return nil;
 }
 
-func (this *hnsw) Search(ctx context.Context, query math.Vector, k uint) (SearchResult, error) {
+func (this *Hnsw) Search(ctx context.Context, query math.Vector, k uint) (SearchResult, error) {
     entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
     if entrypoint == nil {
         return nil, EmptyIndexError
@@ -201,11 +201,15 @@ func (this *hnsw) Search(ctx context.Context, query math.Vector, k uint) (Search
     return result, nil
 }
 
-func (this *hnsw) getVerticesShard(id uint64) (map[uint64]*hnswVertex, *sync.RWMutex) {
+func (this *Hnsw) RandomLevel() int {
+    return math.Floor(math.RandomExponential(this.config.levelMultiplier))
+}
+
+func (this *Hnsw) getVerticesShard(id uint64) (map[uint64]*hnswVertex, *sync.RWMutex) {
     return this.vertices[id % uint64(VERTICES_MAP_SHARD_COUNT)], this.verticesMu[id % uint64(VERTICES_MAP_SHARD_COUNT)]
 }
 
-func (this *hnsw) storeVertex(vertex *hnswVertex) error {
+func (this *Hnsw) storeVertex(vertex *hnswVertex) error {
     m, mu := this.getVerticesShard(vertex.id)
     defer mu.Unlock()
     mu.Lock()
@@ -219,7 +223,7 @@ func (this *hnsw) storeVertex(vertex *hnswVertex) error {
     return nil
 }
 
-func (this *hnsw) removeVertex(id uint64) (*hnswVertex, error) {
+func (this *Hnsw) removeVertex(id uint64) (*hnswVertex, error) {
     m, mu := this.getVerticesShard(id)
     defer mu.Unlock()
     mu.Lock()
@@ -234,11 +238,7 @@ func (this *hnsw) removeVertex(id uint64) (*hnswVertex, error) {
     return nil, ItemNotFoundError
 }
 
-func (this *hnsw) randomLevel() int {
-    return math.Floor(math.RandomExponential(this.config.levelMultiplier))
-}
-
-func (this *hnsw) greedyClosestNeighbor(query math.Vector, entrypoint *hnswVertex, minDistance float32, level int) (*hnswVertex, float32) {
+func (this *Hnsw) greedyClosestNeighbor(query math.Vector, entrypoint *hnswVertex, minDistance float32, level int) (*hnswVertex, float32) {
     for {
         var closestNeighbor *hnswVertex
 
@@ -263,7 +263,7 @@ func (this *hnsw) greedyClosestNeighbor(query math.Vector, entrypoint *hnswVerte
     return entrypoint, minDistance
 }
 
-func (this *hnsw) searchLevel(query math.Vector, entrypoint *hnswVertex, ef, level int) utils.PriorityQueue {
+func (this *Hnsw) searchLevel(query math.Vector, entrypoint *hnswVertex, ef, level int) utils.PriorityQueue {
     entrypointDistance := this.space.Distance(query, entrypoint.vector)
 
     pqItem := utils.NewPriorityQueueItem(entrypointDistance, entrypoint)
@@ -310,7 +310,7 @@ func (this *hnsw) searchLevel(query math.Vector, entrypoint *hnswVertex, ef, lev
     return resultVertices
 }
 
-func (this *hnsw) selectNeighbors(neighbors utils.PriorityQueue, k int) utils.PriorityQueue {
+func (this *Hnsw) selectNeighbors(neighbors utils.PriorityQueue, k int) utils.PriorityQueue {
     for neighbors.Len() > k {
         neighbors.Pop()
     }
@@ -318,7 +318,7 @@ func (this *hnsw) selectNeighbors(neighbors utils.PriorityQueue, k int) utils.Pr
     return neighbors
 }
 
-func (this *hnsw) selectNeighborsHeuristic(query math.Vector, neighbors utils.PriorityQueue, k, level int, extendCandidates, keepPruned bool) utils.PriorityQueue {
+func (this *Hnsw) selectNeighborsHeuristic(query math.Vector, neighbors utils.PriorityQueue, k, level int, extendCandidates, keepPruned bool) utils.PriorityQueue {
     candidateVertices := neighbors.Reverse()  // MinPriorityQueue
 
     existingCandidatesSize := neighbors.Len()
@@ -369,7 +369,7 @@ func (this *hnsw) selectNeighborsHeuristic(query math.Vector, neighbors utils.Pr
     return result
 }
 
-func (this *hnsw) pruneNeighbors(vertex *hnswVertex, k, level int) {
+func (this *Hnsw) pruneNeighbors(vertex *hnswVertex, k, level int) {
     neighborsQueue := utils.NewMaxPriorityQueue()
 
     vertex.edgeMutexes[level].RLock()

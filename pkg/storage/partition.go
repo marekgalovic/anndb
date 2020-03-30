@@ -1,15 +1,137 @@
 package storage
 
 import (
+	"context";
+
+	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/math";
+	"github.com/marekgalovic/anndb/pkg/index";
+	"github.com/marekgalovic/anndb/pkg/index/space";
+	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	"github.com/marekgalovic/anndb/pkg/utils";
+
 	"github.com/satori/go.uuid";
+	"github.com/golang/protobuf/proto";
 )
 
 type partition struct {
 	id uuid.UUID
+	dataset *Dataset
+	index *index.Hnsw
+
+	raft *raft.RaftGroup
+
+	insertNotifications *utils.Notificator
+	deleteNotifications *utils.Notificator
 }
 
-func newPartition(id uuid.UUID) *partition {
-	return &partition {
-		id: id,
+func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
+	var s space.Space
+	switch dataset.GetSpace() {
+	case pb.Space_Euclidean:
+		s = space.NewEuclidean()
+	case pb.Space_Manhattan:
+		s = space.NewManhattan()
+	case pb.Space_Cosine:
+		s = space.NewCosine()
 	}
+
+	return index.NewHnsw(uint(dataset.GetDimension()), s) 
+}
+
+func newPartition(id uuid.UUID, dataset *Dataset) *partition {
+	p := &partition {
+		id: id,
+		dataset: dataset,
+		index: newIndexFromDatasetProto(dataset.Meta()),
+		insertNotifications: utils.NewNotificator(),
+		deleteNotifications: utils.NewNotificator(),
+	}
+
+	return p
+}
+
+func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
+	proposal := &pb.PartitionChange {
+		Type: pb.PartitionChangeType_InsertValue,
+		Id: id,
+		Value: value,
+		Level: int32(this.index.RandomLevel()),
+	}
+	proposalData, err := proto.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+
+	notif := this.insertNotifications.Create(id)
+	defer func() { this.insertNotifications.Remove(id) }()
+
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
+		return err
+	}
+
+	select {
+	case err := <- notif:
+		if err != nil {
+			return err.(error)
+		}
+		return nil
+	case <- ctx.Done():
+		return nil
+	}
+}
+
+func (this *partition) remove(ctx context.Context, id uint64) error {
+	proposal := &pb.PartitionChange {
+		Type: pb.PartitionChangeType_DeleteValue,
+		Id: id,
+	}
+	proposalData, err := proto.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+
+	notif := this.deleteNotifications.Create(id)
+	defer func() { this.deleteNotifications.Remove(id) }()
+
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
+		return err
+	}
+
+	select {
+	case err := <- notif:
+		if err != nil {
+			return err.(error)
+		}
+		return nil
+	case <- ctx.Done():
+		return nil
+	}
+}
+
+func (this *partition) process(data []byte) error {
+	var change pb.PartitionChange
+	if err := proto.Unmarshal(data, &change); err != nil {
+		return err
+	}
+
+	switch change.Type {
+	case pb.PartitionChangeType_InsertValue:
+		return this.insertValue(change.GetId(), change.GetValue(), int(change.GetLevel()))
+	case pb.PartitionChangeType_DeleteValue:
+		return this.deleteValue(change.GetId())
+	}
+	return nil
+}
+
+func (this *partition) insertValue(id uint64, value []float32, level int) error {
+	err := this.index.Insert(id, value, level);
+	this.insertNotifications.Notify(id, err)
+	return nil
+}
+
+func (this *partition) deleteValue(id uint64) error {
+	err := this.index.Remove(id);
+	this.deleteNotifications.Notify(id, err)
+	return nil
 }

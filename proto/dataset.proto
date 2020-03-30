@@ -22,6 +22,7 @@ message Dataset {
 	uint32 partition_count = 4;
 	uint32 replication_factor = 5;
 	repeated Partition partitions = 6;
+	repeated uint64 node_ids = 7;
 }
 
 message Partition {
@@ -29,11 +30,23 @@ message Partition {
 }
 
 enum DatasetsChangeType {
-	Create = 0;
-	Delete = 1;
+	CreateDataset = 0;
+	DeleteDataset = 1;
 }
 
 message DatasetsChange {
 	DatasetsChangeType type = 1;
 	Dataset dataset = 2;
+}
+
+enum PartitionChangeType {
+	InsertValue = 0;
+	DeleteValue = 1;
+}
+
+message PartitionChange {
+	PartitionChangeType type = 1;
+	uint64 id = 2;
+	repeated float value = 3;
+	int32 level = 4;
 }

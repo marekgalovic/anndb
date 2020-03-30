@@ -59,9 +59,13 @@ func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {
 func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*Dataset, error) {
 	id := uuid.NewV4()
 	dataset.Id = id.Bytes()
+	dataset.Partitions = make([]*pb.Partition, dataset.GetPartitionCount())
+	for i := 0; i < int(dataset.GetPartitionCount()); i++ {
+		dataset.Partitions[i] = &pb.Partition {Id: uuid.NewV4().Bytes()}
+	}
 
 	proposal := &pb.DatasetsChange {
-		Type: pb.DatasetsChangeType_Create,
+		Type: pb.DatasetsChangeType_CreateDataset,
 		Dataset: dataset,
 	}
 	proposalData, err := proto.Marshal(proposal)
@@ -72,7 +76,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 	notif := this.createdNotifications.Create(id)
 	defer func() { this.createdNotifications.Remove(id) }()
 
-	if err := this.zeroGroup.Propose(proposalData); err != nil {
+	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +93,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 
 func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	proposal := &pb.DatasetsChange {
-		Type: pb.DatasetsChangeType_Delete,
+		Type: pb.DatasetsChangeType_DeleteDataset,
 		Dataset: &pb.Dataset {Id: id.Bytes()},
 	}
 	proposalData, err := proto.Marshal(proposal)
@@ -100,7 +104,7 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	notif := this.deletedNotifications.Create(id)
 	defer func() { this.deletedNotifications.Remove(id) }()
 
-	if err := this.zeroGroup.Propose(proposalData); err != nil {
+	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
 		return err
 	}
 
@@ -122,9 +126,9 @@ func (this *DatasetManager) process(data []byte) error {
 	}
 
 	switch change.Type {
-	case pb.DatasetsChangeType_Create:
+	case pb.DatasetsChangeType_CreateDataset:
 		return this.createDataset(change.Dataset)
-	case pb.DatasetsChangeType_Delete:
+	case pb.DatasetsChangeType_DeleteDataset:
 		return this.deleteDataset(change.Dataset)
 	}
 	return nil
@@ -143,7 +147,11 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 		return nil
 	}
 
-	this.datasets[id] = newDataset(dataset)
+	this.datasets[id], err = newDataset(dataset)
+	if err != nil {
+		this.createdNotifications.Notify(id, err)
+		return nil
+	}
 	this.createdNotifications.Notify(id, nil)
 	log.Infof("Created dataset: %s", id)
 	return nil
