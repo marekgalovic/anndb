@@ -22,7 +22,6 @@ var (
 
 type badgerWAL struct {
 	db *badger.DB
-	nodeId uint64
 	groupId uuid.UUID
 }
 
@@ -50,10 +49,9 @@ func SetBadgerRaftId(db *badger.DB, id uint64) error {
 	})
 } 
 
-func NewBadgerWAL(db *badger.DB, nodeId uint64, groupId uuid.UUID) *badgerWAL {
+func NewBadgerWAL(db *badger.DB, groupId uuid.UUID) *badgerWAL {
 	wal := &badgerWAL{
 		db: db,
-		nodeId: nodeId,
 		groupId: groupId,
 	}
 
@@ -190,38 +188,32 @@ func (this *badgerWAL) Save(hardState raftpb.HardState, entries []raftpb.Entry, 
 }
 
 func (this *badgerWAL) entryKey(idx uint64) []byte {
-	b := make([]byte, 32)
-	binary.BigEndian.PutUint64(b[0:8], this.nodeId)
-	copy(b[8:24], this.groupId.Bytes())
-	binary.BigEndian.PutUint64(b[24:32], idx)
+	b := make([]byte, 24)
+	copy(b[0:16], this.groupId.Bytes())
+	binary.BigEndian.PutUint64(b[16:24], idx)
 	return b
 }
 
 func (this *badgerWAL) entryPrefix() []byte {
-	b := make([]byte, 24)
-	binary.BigEndian.PutUint64(b[0:8], this.nodeId)
-	copy(b[8:24], this.groupId.Bytes())
-	return b
+	return this.groupId.Bytes()
 }
 
 func (this *badgerWAL) hardStateKey() []byte {
-	b := make([]byte, 26)
-	binary.BigEndian.PutUint64(b[0:8], this.nodeId)
-	copy(b[8:10], []byte("hs"))
-	copy(b[10:26], this.groupId.Bytes())
+	b := make([]byte, 18)
+	copy(b[0:2], []byte("hs"))
+	copy(b[2:18], this.groupId.Bytes())
 	return b
 }
 
 func (this *badgerWAL) snapshotKey() []byte {
-	b := make([]byte, 26)
-	binary.BigEndian.PutUint64(b[0:8], this.nodeId)
-	copy(b[8:10], []byte("ss"))
-	copy(b[10:26], this.groupId.Bytes())
+	b := make([]byte, 18)
+	copy(b[0:2], []byte("ss"))
+	copy(b[2:18], this.groupId.Bytes())
 	return b
 }
 
 func (this *badgerWAL) parseIndex(key []byte) uint64 {
-	return binary.BigEndian.Uint64(key[24:32])
+	return binary.BigEndian.Uint64(key[16:24])
 }
 
 func (this *badgerWAL) seekEntry(entry *raftpb.Entry, seekTo uint64, reverse bool) (uint64, error) {

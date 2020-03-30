@@ -29,7 +29,7 @@ func main() {
 	flag.StringVar(&dataDir, "data-dir", "/tmp", "Data directory")
 	flag.Parse()
 
-	db, err := badger.Open(badger.DefaultOptions(path.Join(dataDir, "anndb")))
+	db, err := badger.Open(badger.LSMOnlyOptions(path.Join(dataDir, "anndb")))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func main() {
 	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port))
 
 	// Start raft zero group
-	zeroGroup, err := raft.NewRaftGroup(uuid.Nil, getZeroNodeIds(raftTransport.NodeId(), joinNodesRaw), wal.NewBadgerWAL(db, raftNodeId, uuid.Nil), raftTransport)
+	zeroGroup, err := raft.NewRaftGroup(uuid.Nil, getZeroNodeIds(raftTransport.NodeId(), joinNodesRaw), wal.NewBadgerWAL(db, uuid.Nil), raftTransport)
 	if err != nil {
 		log.Fatal(err)
 	}

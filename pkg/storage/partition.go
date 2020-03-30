@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context";
+	"time";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/math";
@@ -14,7 +15,6 @@ import (
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
 	badger "github.com/dgraph-io/badger/v2";
-	log "github.com/sirupsen/logrus";
 )
 
 type partition struct {
@@ -46,7 +46,7 @@ func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *b
 	raft, err := raft.NewRaftGroup(
 		id,
 		nodeIds,
-		wal.NewBadgerWAL(raftWalDB, raftTransport.NodeId(), id),
+		wal.NewBadgerWAL(raftWalDB, id),
 		raftTransport,
 	)
 	if err != nil {
@@ -75,6 +75,9 @@ func (this *partition) close() {
 }
 
 func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
+	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	defer cancelCtx()
+
 	proposal := &pb.PartitionChange {
 		Type: pb.PartitionChangeType_InsertValue,
 		Id: id,
@@ -100,11 +103,14 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 		}
 		return nil
 	case <- ctx.Done():
-		return nil
+		return ctx.Err()
 	}
 }
 
 func (this *partition) remove(ctx context.Context, id uint64) error {
+	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	defer cancelCtx()
+
 	proposal := &pb.PartitionChange {
 		Type: pb.PartitionChangeType_DeleteValue,
 		Id: id,
@@ -128,7 +134,7 @@ func (this *partition) remove(ctx context.Context, id uint64) error {
 		}
 		return nil
 	case <- ctx.Done():
-		return nil
+		return ctx.Err()
 	}
 }
 
@@ -150,13 +156,11 @@ func (this *partition) process(data []byte) error {
 func (this *partition) insertValue(id uint64, value []float32, level int) error {
 	err := this.index.Insert(id, value, level);
 	this.insertNotifications.Notify(id, err)
-	log.Infof("Partition %s insert %d", this.id, id)
 	return nil
 }
 
 func (this *partition) deleteValue(id uint64) error {
 	err := this.index.Remove(id);
 	this.deleteNotifications.Notify(id, err)
-	log.Infof("Partition %s delete %d", this.id, id)
 	return nil
 }

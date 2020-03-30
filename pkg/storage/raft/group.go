@@ -139,7 +139,7 @@ func (this *RaftGroup) Join(nodes []string) error {
 }
 
 func (this *RaftGroup) run() {
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {

@@ -4,6 +4,7 @@ import (
 	"errors";
 	"context";
 	"sync";
+	"time";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
@@ -13,7 +14,6 @@ import (
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
 	badger "github.com/dgraph-io/badger/v2";
-	log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -74,6 +74,9 @@ func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {
 }
 
 func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*Dataset, error) {
+	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	defer cancelCtx()
+
 	id := uuid.NewV4()
 	dataset.Id = id.Bytes()
 	dataset.Partitions = make([]*pb.Partition, dataset.GetPartitionCount())
@@ -108,11 +111,14 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 		}
 		return this.Get(id)
 	case <- ctx.Done():
-		return nil, nil
+		return nil, ctx.Err()
 	}
 }
 
 func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
+	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	defer cancelCtx()
+
 	proposal := &pb.DatasetsChange {
 		Type: pb.DatasetsChangeType_DeleteDataset,
 		Dataset: &pb.Dataset {Id: id.Bytes()},
@@ -136,7 +142,7 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 		}
 		return nil
 	case <- ctx.Done():
-		return nil
+		return ctx.Err()
 	}
 }
 
@@ -174,7 +180,6 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 		return nil
 	}
 	this.createdNotifications.Notify(id, nil)
-	log.Infof("Created dataset: %s", id)
 	return nil
 }
 
@@ -193,7 +198,6 @@ func (this *DatasetManager) deleteDataset(dataset *pb.Dataset) error {
 
 	delete(this.datasets, id)
 	this.deletedNotifications.Notify(id, nil)
-	log.Infof("Deleted dataset: %s", id)
 	return nil
 }
 
