@@ -16,6 +16,7 @@ func RandomDistinctInts(n, max int) []int {
             i++
         }
     }
+
     return result
 }
 

@@ -8,10 +8,13 @@ import (
 	"github.com/marekgalovic/anndb/pkg/index";
 	"github.com/marekgalovic/anndb/pkg/index/space";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	"github.com/marekgalovic/anndb/pkg/storage/wal";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
+	badger "github.com/dgraph-io/badger/v2";
+	log "github.com/sirupsen/logrus";
 )
 
 type partition struct {
@@ -39,16 +42,36 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 	return index.NewHnsw(uint(dataset.GetDimension()), s) 
 }
 
-func newPartition(id uuid.UUID, dataset *Dataset) *partition {
+func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) *partition {
+	raft, err := raft.NewRaftGroup(
+		id,
+		nodeIds,
+		wal.NewBadgerWAL(raftWalDB, raftTransport.NodeId(), id),
+		raftTransport,
+	)
+	if err != nil {
+		// TODO:
+		panic(err)
+	}
+
 	p := &partition {
 		id: id,
 		dataset: dataset,
 		index: newIndexFromDatasetProto(dataset.Meta()),
+		raft: raft,
 		insertNotifications: utils.NewNotificator(),
 		deleteNotifications: utils.NewNotificator(),
 	}
 
+	if err := raft.RegisterProcessFn(p.process); err != nil {
+		panic(err)
+	}
+
 	return p
+}
+
+func (this *partition) close() {
+	this.raft.Stop()
 }
 
 func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
@@ -127,11 +150,13 @@ func (this *partition) process(data []byte) error {
 func (this *partition) insertValue(id uint64, value []float32, level int) error {
 	err := this.index.Insert(id, value, level);
 	this.insertNotifications.Notify(id, err)
+	log.Infof("Partition %s insert %d", this.id, id)
 	return nil
 }
 
 func (this *partition) deleteValue(id uint64) error {
 	err := this.index.Remove(id);
 	this.deleteNotifications.Notify(id, err)
+	log.Infof("Partition %s delete %d", this.id, id)
 	return nil
 }

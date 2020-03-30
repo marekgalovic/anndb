@@ -49,10 +49,11 @@ func main() {
 	}
 	defer zeroGroup.Stop()
 
-	datasetManager, err := storage.NewDatasetManager(zeroGroup)
+	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer datasetManager.Close()
 
 	log.Info(datasetManager)
 
@@ -65,6 +66,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
 	pb.RegisterDatasetManagerServer(grpcServer, services.NewDatasetManagerServer(datasetManager))
+	pb.RegisterDataManagerServer(grpcServer, services.NewDataManagerServer(datasetManager))
 	go grpcServer.Serve(listener)
 
 	// Join cluster

@@ -7,10 +7,12 @@ import (
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	"github.com/marekgalovic/anndb/pkg/math";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
+	badger "github.com/dgraph-io/badger/v2";
 	log "github.com/sirupsen/logrus";
 )
 
@@ -21,6 +23,9 @@ var (
 
 type DatasetManager struct {
 	zeroGroup *raft.RaftGroup
+	raftWalDB *badger.DB
+	raftTransport *raft.RaftTransport
+
 	datasets map[uuid.UUID]*Dataset
 	datasetsMu *sync.RWMutex
 
@@ -28,9 +33,12 @@ type DatasetManager struct {
 	deletedNotifications *utils.Notificator
 }
 
-func NewDatasetManager(zeroGroup *raft.RaftGroup) (*DatasetManager, error) {
+func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) (*DatasetManager, error) {
 	dm := &DatasetManager {
 		zeroGroup: zeroGroup,
+		raftWalDB: raftWalDB,
+		raftTransport: raftTransport,
+
 		datasets: make(map[uuid.UUID]*Dataset),
 		datasetsMu: &sync.RWMutex{},
 
@@ -43,6 +51,15 @@ func NewDatasetManager(zeroGroup *raft.RaftGroup) (*DatasetManager, error) {
 	}
 
 	return dm, nil
+}
+
+func (this *DatasetManager) Close() {
+	this.datasetsMu.Lock()
+	defer this.datasetsMu.Unlock()
+
+	for _, dataset := range this.datasets {
+		dataset.close()
+	}
 }
 
 func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {
@@ -60,8 +77,12 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 	id := uuid.NewV4()
 	dataset.Id = id.Bytes()
 	dataset.Partitions = make([]*pb.Partition, dataset.GetPartitionCount())
+	partitionsNodeIds := this.getPartitionsNodeIds(this.raftTransport.NodeIds(), uint(dataset.GetPartitionCount()), uint(dataset.GetReplicationFactor()))
 	for i := 0; i < int(dataset.GetPartitionCount()); i++ {
-		dataset.Partitions[i] = &pb.Partition {Id: uuid.NewV4().Bytes()}
+		dataset.Partitions[i] = &pb.Partition {
+			Id: uuid.NewV4().Bytes(),
+			NodeIds: partitionsNodeIds[i],
+		}
 	}
 
 	proposal := &pb.DatasetsChange {
@@ -147,7 +168,7 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 		return nil
 	}
 
-	this.datasets[id], err = newDataset(dataset)
+	this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport)
 	if err != nil {
 		this.createdNotifications.Notify(id, err)
 		return nil
@@ -174,5 +195,20 @@ func (this *DatasetManager) deleteDataset(dataset *pb.Dataset) error {
 	this.deletedNotifications.Notify(id, nil)
 	log.Infof("Deleted dataset: %s", id)
 	return nil
+}
+
+func (this *DatasetManager) getPartitionsNodeIds(nodeIds []uint64, partitionCount uint, replicationFactor uint) [][]uint64 {
+	partitionsNodeIds := make([][]uint64, partitionCount)
+	k := math.MinInt(len(nodeIds), int(replicationFactor))
+
+	for i := 0; i < int(partitionCount); i++ {
+		indices := math.RandomDistinctInts(k, len(nodeIds))
+		partitionsNodeIds[i] = make([]uint64, len(indices))
+		for j, idx := range indices {
+			partitionsNodeIds[i][j] = nodeIds[idx]
+		}
+	}
+
+	return partitionsNodeIds
 }
 

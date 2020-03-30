@@ -9,6 +9,22 @@ service DatasetManager {
 	rpc Delete(UUIDRequest) returns (EmptyMessage);
 }
 
+service DataManager {
+	rpc Insert(InsertRequest) returns (EmptyMessage);
+	rpc Remove(RemoveRequest) returns (EmptyMessage);
+}
+
+message InsertRequest {
+	bytes dataset_id = 1;
+	uint64 id = 2;
+	repeated float value = 3;
+}
+
+message RemoveRequest {
+	bytes dataset_id = 1;
+	uint64 id = 2;
+}
+
 enum Space {
 	Euclidean = 0;
 	Manhattan = 1;
@@ -22,11 +38,11 @@ message Dataset {
 	uint32 partition_count = 4;
 	uint32 replication_factor = 5;
 	repeated Partition partitions = 6;
-	repeated uint64 node_ids = 7;
 }
 
 message Partition {
 	bytes id = 1;
+	repeated uint64 node_ids = 2;
 }
 
 enum DatasetsChangeType {

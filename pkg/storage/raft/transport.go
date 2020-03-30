@@ -61,6 +61,18 @@ func (this *RaftTransport) Address() string {
 	return this.address
 }
 
+func (this *RaftTransport) NodeIds() []uint64 {
+	this.nodeAddressesMu.RLock()
+	defer this.nodeAddressesMu.RUnlock()
+
+	ids := make([]uint64, 0, len(this.nodeAddresses))
+	for id, _ := range this.nodeAddresses {
+		ids = append(ids, id)
+	}
+
+	return ids
+}
+
 func (this *RaftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTransport_ProposeJoinServer) error {
 	groupId, err := uuid.FromBytes(req.GetGroupId())
 	if err != nil {

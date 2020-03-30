@@ -3,12 +3,15 @@ package storage
 import (
 	"errors";
 	"context";
+	"sync";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/index";
 	"github.com/marekgalovic/anndb/pkg/math";
+	"github.com/marekgalovic/anndb/pkg/storage/raft";
 	
 	"github.com/satori/go.uuid";
+	badger "github.com/dgraph-io/badger/v2";
 )
 
 var (
@@ -19,23 +22,33 @@ type Dataset struct {
 	meta *pb.Dataset
 
 	partitions []*partition
+	partitionsMu *sync.RWMutex
 }
 
-func newDataset(meta *pb.Dataset) (*Dataset, error) {
+func newDataset(meta *pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) (*Dataset, error) {
 	d := &Dataset {
 		meta: meta,
 		partitions: make([]*partition, meta.GetPartitionCount()),
 	}
 
 	for i := 0; i < int(meta.GetPartitionCount()); i++ {
-		pid, err := uuid.FromBytes(meta.Partitions[i].Id)
+		pid, err := uuid.FromBytes(meta.Partitions[i].GetId())
 		if err != nil {
 			return nil, err
 		}
-		d.partitions[i] = newPartition(pid, d)
+		d.partitions[i] = newPartition(pid, meta.Partitions[i].GetNodeIds(), d, raftWalDB, raftTransport)
 	}
 
 	return d, nil
+}
+
+func (this *Dataset) close() {
+	this.partitionsMu.Lock()
+	defer this.partitionsMu.Unlock()
+
+	for _, partition := range this.partitions {
+		partition.close()
+	}
 }
 
 func (this *Dataset) Meta() *pb.Dataset {
