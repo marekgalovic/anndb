@@ -15,7 +15,10 @@ compile_sse:
 compile_protos:
 	protoc -I ./proto --go_out=plugins=grpc:./pkg/protobuf ./proto/*.proto
 
-run:
+run_clean:
 	rm -rf ./data/${ID}
 	mkdir -p ./data/${ID}
+	go run cmd/anndb/main.go --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"
+
+run:
 	go run cmd/anndb/main.go --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"

@@ -32,6 +32,8 @@ type RaftTransport struct {
 }
 
 func NewTransport(nodeId uint64, address string, clusterConn *cluster.Conn) *RaftTransport {
+	clusterConn.AddNode(nodeId, address)
+
 	return &RaftTransport {
 		nodeId: nodeId,
 		address: address,

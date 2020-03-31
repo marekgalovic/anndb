@@ -6,6 +6,7 @@ import (
 	"sync";
 	"math/rand";
 	"sort";
+	"io";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/cluster";
@@ -89,26 +90,33 @@ func (this *Dataset) Search(ctx context.Context, query math.Vector, k uint) (ind
 		return nil, err
 	}
 
-	resultCh := make(chan index.SearchResult)
-	defer close(resultCh)
-	errorCh := make(chan error)
-	defer close(errorCh)
+	ctx, cancelCtx := context.WithCancel(ctx)
+	defer cancelCtx()
 
 	nodePartitions := this.getSearchQueryNodes()
+
+	wg := &sync.WaitGroup{}
+	resultCh := make(chan index.SearchResult, len(nodePartitions))
+	errorCh := make(chan error, len(nodePartitions))
+
 	for nodeId, partitionIds := range nodePartitions {
-		go this.searchPartitionsOnNode(ctx, nodeId, partitionIds, query, k, resultCh, errorCh)
+		wg.Add(1)
+		go this.searchPartitionsOnNode(ctx, nodeId, partitionIds, query, k, wg, resultCh, errorCh)
 	}
 
+	go func() {
+		wg.Wait()
+		close(resultCh)
+		close(errorCh)
+	}()
+
 	result := make(index.SearchResult, 0, int(k) * len(nodePartitions))
-	finishedCount := 0
-	for {
+	for i := 0; i < len(nodePartitions); i++ {
 		select {
 		case items := <- resultCh:
 			result = append(result, items...)
-			finishedCount++
-			if finishedCount == len(nodePartitions) {
-				break
-			}
+		case err := <- errorCh:
+			return nil, err
 		case <- ctx.Done():
 			return nil, ctx.Err()
 		}
@@ -128,40 +136,26 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 		}
 	}
 
-	resultCh := make(chan index.SearchResult)
-	defer close(resultCh)
-	errorCh := make(chan error)
-	defer close(errorCh)
+	wg := &sync.WaitGroup{}
+	resultCh := make(chan index.SearchResult, len(partitions))	
+	errorCh := make(chan error, len(partitions))
 
-	for _, p := range partitions {
-		go func(p *partition) {
-			result, err := p.search(ctx, query, k)
-			if err != nil {
-				select {
-				case errorCh <- err:
-				case <- ctx.Done():
-					return
-				}
-			} else {
-				select {
-				case resultCh <- result:
-				case <- ctx.Done():
-					return		
-				}
-			}
-		}(p)
+	for _, partition := range partitions {
+		wg.Add(1)
+		go this.searchPartition(ctx, partition, query, k, wg, resultCh, errorCh)
 	}
 
+	go func() {
+		wg.Wait()
+		close(resultCh)
+		close(errorCh)
+	}()
+
 	result := make(index.SearchResult, 0, int(k) * len(partitions))
-	finishedCount := 0
-	for {
+	for i := 0; i < len(partitions); i++ {
 		select {
 		case items := <- resultCh:
 			result = append(result, items...)
-			finishedCount++
-			if finishedCount == len(partitions) {
-				break
-			}
 		case err := <- errorCh:
 			return nil, err
 		case <- ctx.Done():
@@ -226,7 +220,9 @@ func (this *Dataset) getSearchQueryNodes() map[uint64][]uuid.UUID {
 	return result
 }
 
-func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, partitionIds []uuid.UUID, query math.Vector, k uint, resultCh chan index.SearchResult, errorCh chan error) {
+func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, partitionIds []uuid.UUID, query math.Vector, k uint, wg *sync.WaitGroup, resultCh chan index.SearchResult, errorCh chan error) {
+	defer wg.Done()
+
 	client, err := this.getNodeSearchClient(ctx, nodeId)
 	if err != nil {
 		errorCh <- err
@@ -254,6 +250,9 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 	result := make(index.SearchResult, 0, k)
 	for {
 		item, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			errorCh <- err
 			return
@@ -265,6 +264,17 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 		})
 	}
 
+	resultCh <- result
+}
+
+func (this *Dataset) searchPartition(ctx context.Context, partition *partition, query math.Vector, k uint, wg *sync.WaitGroup, resultCh chan index.SearchResult, errorCh chan error) {
+	defer wg.Done()
+
+	result, err := partition.search(ctx, query, k)
+	if err != nil {
+		errorCh <- err
+		return
+	}
 	resultCh <- result
 }
 
