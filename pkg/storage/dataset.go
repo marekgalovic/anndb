@@ -136,6 +136,9 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 		}
 	}
 
+	ctx, cancelCtx := context.WithCancel(ctx)
+	defer cancelCtx()
+
 	wg := &sync.WaitGroup{}
 	resultCh := make(chan index.SearchResult, len(partitions))	
 	errorCh := make(chan error, len(partitions))
