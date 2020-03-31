@@ -5,6 +5,8 @@ import (
 	"errors";
 
 	"google.golang.org/grpc";
+	"google.golang.org/grpc/credentials";
+	log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -16,14 +18,37 @@ type Conn struct {
 	addressesMu sync.RWMutex
 	conns map[uint64]*grpc.ClientConn
 	connsMu sync.RWMutex
+
+	transportCredentials credentials.TransportCredentials
 }
 
-func NewConn() *Conn {
-	return &Conn {
+func NewConn(tlsCertFile string) (*Conn, error) {
+	c := &Conn {
 		addresses: make(map[uint64]string),
 		addressesMu: sync.RWMutex{},
 		conns: make(map[uint64]*grpc.ClientConn),
 		connsMu: sync.RWMutex{},
+	}
+
+	if tlsCertFile != "" {
+		var err error
+		c.transportCredentials, err = credentials.NewClientTLSFromFile(tlsCertFile, "")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return c, nil
+}
+
+func (this *Conn) Close() {
+	this.connsMu.Lock()
+	defer this.connsMu.Unlock()
+
+	for _, conn := range this.conns {
+		if err := conn.Close(); err != nil {
+			log.Error(err)
+		}
 	}
 }
 
@@ -67,7 +92,9 @@ func (this *Conn) RemoveNode(id uint64) {
 
 	delete(this.addresses, id)
 	if conn, exists := this.conns[id]; exists {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Error(err)
+		}
 		delete(this.conns, id)
 	}
 }
@@ -82,7 +109,7 @@ func (this *Conn) Dial(id uint64) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	conn, err = grpc.Dial(address, grpc.WithInsecure())
+	conn, err = grpc.Dial(address, this.grpcDialOptions()...)
 	if err != nil {
 		return nil, err
 	}
@@ -117,4 +144,15 @@ func (this *Conn) getAddress(id uint64) (string, error) {
 	}
 
 	return "", NodeAddressNotFoundError
+}
+
+func (this *Conn) grpcDialOptions() []grpc.DialOption {
+	options := make([]grpc.DialOption, 0)
+	if this.transportCredentials != nil {
+		options = append(options, grpc.WithTransportCredentials(this.transportCredentials))
+	} else {
+		options = append(options, grpc.WithInsecure())
+	}
+	
+	return options
 }

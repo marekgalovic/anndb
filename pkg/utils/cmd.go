@@ -11,3 +11,11 @@ func InterruptSignal() <-chan os.Signal {
     signal.Notify(wait, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
     return wait
 }
+
+func GetenvDefault(key, defaultVal string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	return val
+}

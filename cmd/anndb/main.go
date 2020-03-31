@@ -17,6 +17,7 @@ import (
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
+	"google.golang.org/grpc/credentials";
 	badger "github.com/dgraph-io/badger/v2"
 	log "github.com/sirupsen/logrus";
 )
@@ -25,9 +26,13 @@ func main() {
 	var port string
 	var joinNodesRaw string
 	var dataDir string
-	flag.StringVar(&port, "port", "6000", "Node port")
-	flag.StringVar(&joinNodesRaw, "join", "", "Comma separated list of existing cluster nodes")
-	flag.StringVar(&dataDir, "data-dir", "/tmp", "Data directory")
+	var tlsCertFile string
+	var tlsKeyFile string
+	flag.StringVar(&port, "port", utils.GetenvDefault("ANNDB_PORT", "6000"), "Node port")
+	flag.StringVar(&joinNodesRaw, "join", utils.GetenvDefault("ANNDB_JOIN", ""), "Comma separated list of existing cluster nodes")
+	flag.StringVar(&dataDir, "data-dir", utils.GetenvDefault("ANNDB_DATA_DIR", "/tmp"), "Data directory")
+	flag.StringVar(&tlsCertFile, "cert", utils.GetenvDefault("ANNDB_CERT", ""), "TLS Certificate file")
+	flag.StringVar(&tlsKeyFile, "key", utils.GetenvDefault("ANNDB_KEY", ""), "TLS Key file")
 	flag.Parse()
 
 	db, err := badger.Open(badger.LSMOnlyOptions(path.Join(dataDir, "anndb")).WithLogger(log.New()))
@@ -41,7 +46,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	clusterConn := cluster.NewConn()
+	clusterConn, err := cluster.NewConn(tlsCertFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer clusterConn.Close()
+
 	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port), clusterConn)
 
 	// Start raft zero group
@@ -63,7 +73,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServerOptions := make([]grpc.ServerOption, 0)
+	if tlsCertFile != "" && tlsKeyFile != "" {
+		creds, err := credentials.NewServerTLSFromFile(tlsCertFile, tlsKeyFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		grpcServerOptions = append(grpcServerOptions, grpc.Creds(creds))
+	}
+
+	grpcServer := grpc.NewServer(grpcServerOptions...)
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
 	pb.RegisterDatasetManagerServer(grpcServer, services.NewDatasetManagerServer(datasetManager))
 	pb.RegisterDataManagerServer(grpcServer, services.NewDataManagerServer(datasetManager))
