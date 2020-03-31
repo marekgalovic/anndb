@@ -19,6 +19,18 @@ func NewDatasetManagerServer(manager *storage.DatasetManager) *datasetManagerSer
 	}
 }
 
+func (this *datasetManagerServer) List(req *pb.EmptyMessage, stream pb.DatasetManager_ListServer) error {
+	datasets := this.manager.List()
+
+	for _, dataset := range datasets {
+		if err := stream.Send(dataset); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (this *datasetManagerServer) Get(ctx context.Context, req *pb.UUIDRequest) (*pb.Dataset, error) {
 	id, err := uuid.FromBytes(req.GetId())
 	if err != nil {

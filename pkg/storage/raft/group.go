@@ -31,12 +31,13 @@ type RaftGroup struct {
 
 	raft etcdRaft.Node
 	wal wal.WAL
+	log etcdRaft.Logger
 }
 
 func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
 	logger := log.WithFields(log.Fields{
-    	"raft_node_id": transport.nodeId,
-    	"raft_group_id": id.String(),
+    	"node_id": transport.nodeId,
+    	"group_id": id.String(),
     })
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
@@ -52,12 +53,13 @@ func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *Ra
 
 	var raftNode etcdRaft.Node
 	if len(nodeIds) > 0 {
-		peers := make([]etcdRaft.Peer, len(nodeIds))
-		for i, nodeId := range nodeIds {
-			peers[i] = etcdRaft.Peer{ID: nodeId}
+		var peers []etcdRaft.Peer
+		for _, nodeId := range nodeIds {
+			peers = append(peers, etcdRaft.Peer{ID: nodeId})
 		}
 		raftNode = etcdRaft.StartNode(raftConfig, peers)
 	} else {
+		// Allow the group to join existing cluster
 		raftNode = etcdRaft.RestartNode(raftConfig)
 	}
 
@@ -69,6 +71,7 @@ func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *Ra
 		processFn: nil,
 		raft: raftNode,
 		wal: storage,
+		log: logger,
 	}
 
 	if err := transport.addGroup(g); err != nil {

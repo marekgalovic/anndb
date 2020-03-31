@@ -5,11 +5,11 @@ import (
 	"context";
 	"sync";
 	"time";
+	"math/rand"
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/cluster";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
-	"github.com/marekgalovic/anndb/pkg/math";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
@@ -63,6 +63,20 @@ func (this *DatasetManager) Close() {
 	for _, dataset := range this.datasets {
 		dataset.close()
 	}
+}
+
+func (this *DatasetManager) List() []*pb.Dataset {
+	this.datasetsMu.RLock()
+	defer this.datasetsMu.RUnlock()
+
+	i := 0
+	result := make([]*pb.Dataset, len(this.datasets))
+	for _, dataset := range this.datasets {
+		result[i] = dataset.Meta()
+		i++
+	}
+
+	return nil
 }
 
 func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {
@@ -213,16 +227,13 @@ func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
 
 func (this *DatasetManager) getPartitionsNodeIds(nodeIds []uint64, partitionCount uint, replicationFactor uint) [][]uint64 {
 	partitionsNodeIds := make([][]uint64, partitionCount)
-	k := math.MinInt(len(nodeIds), int(replicationFactor))
-
 	for i := 0; i < int(partitionCount); i++ {
-		indices := math.RandomDistinctInts(k, len(nodeIds))
-		partitionsNodeIds[i] = make([]uint64, len(indices))
-		for j, idx := range indices {
-			partitionsNodeIds[i][j] = nodeIds[idx]
-		}
+		rand.Shuffle(len(nodeIds), func(i, j int) {
+			nodeIds[i], nodeIds[j] = nodeIds[j], nodeIds[i]
+		})
+		
+		partitionsNodeIds[i] = nodeIds[:replicationFactor]
 	}
 
 	return partitionsNodeIds
 }
-

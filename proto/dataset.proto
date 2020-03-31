@@ -4,6 +4,7 @@ package anndb_pb;
 import "core.proto";
 
 service DatasetManager {
+	rpc List(EmptyMessage) returns (stream Dataset);
 	rpc Get(UUIDRequest) returns (Dataset);
 	rpc Create(Dataset) returns (Dataset);
 	rpc Delete(UUIDRequest) returns (EmptyMessage);
