@@ -209,8 +209,11 @@ func (this *RaftGroup) processConfChange(entry raftpb.Entry) error {
 		return err
 	}
 
-	if cc.Type == raftpb.ConfChangeAddNode {
+	switch cc.Type {
+	case raftpb.ConfChangeAddNode:
 		this.transport.addNodeAddress(cc.NodeID, string(cc.Context))
+	case raftpb.ConfChangeRemoveNode:
+		this.transport.removeNodeAddress(cc.NodeID)
 	}
 
 	this.raft.ApplyConfChange(cc)

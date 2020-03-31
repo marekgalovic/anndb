@@ -25,8 +25,9 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type SearchRequest struct {
-	Query                []float32 `protobuf:"fixed32,1,rep,packed,name=query,proto3" json:"query,omitempty"`
-	K                    uint32    `protobuf:"varint,2,opt,name=k,proto3" json:"k,omitempty"`
+	DatasetId            []byte    `protobuf:"bytes,1,opt,name=dataset_id,json=datasetId,proto3" json:"dataset_id,omitempty"`
+	Query                []float32 `protobuf:"fixed32,2,rep,packed,name=query,proto3" json:"query,omitempty"`
+	K                    uint32    `protobuf:"varint,3,opt,name=k,proto3" json:"k,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -57,6 +58,13 @@ func (m *SearchRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SearchRequest proto.InternalMessageInfo
 
+func (m *SearchRequest) GetDatasetId() []byte {
+	if m != nil {
+		return m.DatasetId
+	}
+	return nil
+}
+
 func (m *SearchRequest) GetQuery() []float32 {
 	if m != nil {
 		return m.Query
@@ -65,6 +73,69 @@ func (m *SearchRequest) GetQuery() []float32 {
 }
 
 func (m *SearchRequest) GetK() uint32 {
+	if m != nil {
+		return m.K
+	}
+	return 0
+}
+
+type SearchPartitionsRequest struct {
+	DatasetId            []byte    `protobuf:"bytes,1,opt,name=dataset_id,json=datasetId,proto3" json:"dataset_id,omitempty"`
+	PartitionIds         [][]byte  `protobuf:"bytes,2,rep,name=partition_ids,json=partitionIds,proto3" json:"partition_ids,omitempty"`
+	Query                []float32 `protobuf:"fixed32,3,rep,packed,name=query,proto3" json:"query,omitempty"`
+	K                    uint32    `protobuf:"varint,4,opt,name=k,proto3" json:"k,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *SearchPartitionsRequest) Reset()         { *m = SearchPartitionsRequest{} }
+func (m *SearchPartitionsRequest) String() string { return proto.CompactTextString(m) }
+func (*SearchPartitionsRequest) ProtoMessage()    {}
+func (*SearchPartitionsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_453745cff914010e, []int{1}
+}
+
+func (m *SearchPartitionsRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SearchPartitionsRequest.Unmarshal(m, b)
+}
+func (m *SearchPartitionsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SearchPartitionsRequest.Marshal(b, m, deterministic)
+}
+func (m *SearchPartitionsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SearchPartitionsRequest.Merge(m, src)
+}
+func (m *SearchPartitionsRequest) XXX_Size() int {
+	return xxx_messageInfo_SearchPartitionsRequest.Size(m)
+}
+func (m *SearchPartitionsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SearchPartitionsRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SearchPartitionsRequest proto.InternalMessageInfo
+
+func (m *SearchPartitionsRequest) GetDatasetId() []byte {
+	if m != nil {
+		return m.DatasetId
+	}
+	return nil
+}
+
+func (m *SearchPartitionsRequest) GetPartitionIds() [][]byte {
+	if m != nil {
+		return m.PartitionIds
+	}
+	return nil
+}
+
+func (m *SearchPartitionsRequest) GetQuery() []float32 {
+	if m != nil {
+		return m.Query
+	}
+	return nil
+}
+
+func (m *SearchPartitionsRequest) GetK() uint32 {
 	if m != nil {
 		return m.K
 	}
@@ -83,7 +154,7 @@ func (m *SearchResultItem) Reset()         { *m = SearchResultItem{} }
 func (m *SearchResultItem) String() string { return proto.CompactTextString(m) }
 func (*SearchResultItem) ProtoMessage()    {}
 func (*SearchResultItem) Descriptor() ([]byte, []int) {
-	return fileDescriptor_453745cff914010e, []int{1}
+	return fileDescriptor_453745cff914010e, []int{2}
 }
 
 func (m *SearchResultItem) XXX_Unmarshal(b []byte) error {
@@ -120,6 +191,7 @@ func (m *SearchResultItem) GetScore() float32 {
 
 func init() {
 	proto.RegisterType((*SearchRequest)(nil), "anndb_pb.SearchRequest")
+	proto.RegisterType((*SearchPartitionsRequest)(nil), "anndb_pb.SearchPartitionsRequest")
 	proto.RegisterType((*SearchResultItem)(nil), "anndb_pb.SearchResultItem")
 }
 
@@ -128,18 +200,23 @@ func init() {
 }
 
 var fileDescriptor_453745cff914010e = []byte{
-	// 167 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x29, 0x4e, 0x4d, 0x2c,
-	0x4a, 0xce, 0xd0, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x48, 0xcc, 0xcb, 0x4b, 0x49, 0x8a,
-	0x2f, 0x48, 0x52, 0x32, 0xe6, 0xe2, 0x0d, 0x06, 0xcb, 0x04, 0xa5, 0x16, 0x96, 0xa6, 0x16, 0x97,
-	0x08, 0x89, 0x70, 0xb1, 0x16, 0x96, 0xa6, 0x16, 0x55, 0x4a, 0x30, 0x2a, 0x30, 0x6b, 0x30, 0x05,
-	0x41, 0x38, 0x42, 0x3c, 0x5c, 0x8c, 0xd9, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0xbc, 0x41, 0x8c, 0xd9,
-	0x4a, 0x16, 0x5c, 0x02, 0x30, 0x4d, 0xc5, 0xa5, 0x39, 0x25, 0x9e, 0x25, 0xa9, 0xb9, 0x42, 0x7c,
-	0x5c, 0x4c, 0x99, 0x29, 0x12, 0x8c, 0x0a, 0x8c, 0x1a, 0x2c, 0x41, 0x4c, 0x99, 0x29, 0x20, 0x73,
-	0x8a, 0x93, 0xf3, 0x8b, 0x52, 0xc1, 0xba, 0x98, 0x82, 0x20, 0x1c, 0x23, 0x4f, 0x2e, 0x36, 0x88,
-	0x4e, 0x21, 0x7b, 0x38, 0x4b, 0x5c, 0x0f, 0xe6, 0x1a, 0x3d, 0x14, 0xa7, 0x48, 0x49, 0x61, 0x4a,
-	0xc0, 0xac, 0x33, 0x60, 0x4c, 0x62, 0x03, 0x7b, 0xc5, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0x0e,
-	0xf3, 0x43, 0x33, 0xda, 0x00, 0x00, 0x00,
+	// 250 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x51, 0x4f, 0x4b, 0xc3, 0x30,
+	0x14, 0xe7, 0xa5, 0x73, 0xe8, 0x23, 0x15, 0x09, 0xc2, 0xca, 0x40, 0xa8, 0xf3, 0xd2, 0x53, 0x11,
+	0xbd, 0x78, 0xf3, 0xdc, 0x9b, 0x64, 0x1f, 0xa0, 0xa4, 0x4b, 0xc0, 0x30, 0x6d, 0xbb, 0xe4, 0xf5,
+	0xe0, 0xd1, 0x2f, 0xe2, 0x67, 0x15, 0xd3, 0x65, 0x43, 0x0b, 0xb2, 0x5b, 0xde, 0x7b, 0xfc, 0xfe,
+	0x06, 0xb9, 0x37, 0xca, 0x6d, 0x5e, 0xcb, 0xde, 0x75, 0xd4, 0x89, 0x73, 0xd5, 0xb6, 0xba, 0xa9,
+	0xfb, 0x66, 0x25, 0x31, 0x5d, 0x87, 0x8b, 0x34, 0xbb, 0xc1, 0x78, 0x12, 0x37, 0x88, 0x5a, 0x91,
+	0xf2, 0x86, 0x6a, 0xab, 0x33, 0xc8, 0xa1, 0xe0, 0xf2, 0x62, 0xbf, 0xa9, 0xb4, 0xb8, 0xc6, 0xb3,
+	0xdd, 0x60, 0xdc, 0x47, 0xc6, 0xf2, 0xa4, 0x60, 0x72, 0x1c, 0x04, 0x47, 0xd8, 0x66, 0x49, 0x0e,
+	0x45, 0x2a, 0x61, 0xbb, 0xfa, 0x04, 0x5c, 0x8c, 0xa4, 0x2f, 0xca, 0x91, 0x25, 0xdb, 0xb5, 0xfe,
+	0x44, 0xfa, 0x3b, 0x4c, 0xfb, 0x88, 0xa9, 0xad, 0xf6, 0x41, 0x86, 0x4b, 0x7e, 0x58, 0x56, 0xda,
+	0x1f, 0x3d, 0x24, 0x13, 0x0f, 0xb3, 0xe8, 0xe1, 0x09, 0xaf, 0x62, 0x2e, 0x3f, 0xbc, 0x51, 0x45,
+	0xe6, 0x5d, 0x5c, 0x22, 0xdb, 0x6b, 0xce, 0x24, 0xb3, 0x21, 0x8b, 0xdf, 0x74, 0xce, 0x64, 0x2c,
+	0x87, 0x1f, 0x9e, 0x30, 0x3c, 0x7c, 0x01, 0xce, 0x47, 0xa8, 0x78, 0x3e, 0xbc, 0x16, 0x65, 0x6c,
+	0xac, 0xfc, 0x55, 0xd7, 0x72, 0x39, 0x3d, 0x44, 0xbd, 0x7b, 0x10, 0xeb, 0xe8, 0xe2, 0x58, 0x84,
+	0xb8, 0xfd, 0x8b, 0x98, 0x94, 0xf4, 0x3f, 0x69, 0x33, 0x0f, 0x7f, 0xf8, 0xf8, 0x1d, 0x00, 0x00,
+	0xff, 0xff, 0x7a, 0x83, 0xab, 0x8f, 0xd3, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -155,6 +232,7 @@ const _ = grpc.SupportPackageIsVersion6
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type SearchClient interface {
 	Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (Search_SearchClient, error)
+	SearchPartitions(ctx context.Context, in *SearchPartitionsRequest, opts ...grpc.CallOption) (Search_SearchPartitionsClient, error)
 }
 
 type searchClient struct {
@@ -197,9 +275,42 @@ func (x *searchSearchClient) Recv() (*SearchResultItem, error) {
 	return m, nil
 }
 
+func (c *searchClient) SearchPartitions(ctx context.Context, in *SearchPartitionsRequest, opts ...grpc.CallOption) (Search_SearchPartitionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Search_serviceDesc.Streams[1], "/anndb_pb.Search/SearchPartitions", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &searchSearchPartitionsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Search_SearchPartitionsClient interface {
+	Recv() (*SearchResultItem, error)
+	grpc.ClientStream
+}
+
+type searchSearchPartitionsClient struct {
+	grpc.ClientStream
+}
+
+func (x *searchSearchPartitionsClient) Recv() (*SearchResultItem, error) {
+	m := new(SearchResultItem)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SearchServer is the server API for Search service.
 type SearchServer interface {
 	Search(*SearchRequest, Search_SearchServer) error
+	SearchPartitions(*SearchPartitionsRequest, Search_SearchPartitionsServer) error
 }
 
 // UnimplementedSearchServer can be embedded to have forward compatible implementations.
@@ -208,6 +319,9 @@ type UnimplementedSearchServer struct {
 
 func (*UnimplementedSearchServer) Search(req *SearchRequest, srv Search_SearchServer) error {
 	return status.Errorf(codes.Unimplemented, "method Search not implemented")
+}
+func (*UnimplementedSearchServer) SearchPartitions(req *SearchPartitionsRequest, srv Search_SearchPartitionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method SearchPartitions not implemented")
 }
 
 func RegisterSearchServer(s *grpc.Server, srv SearchServer) {
@@ -235,6 +349,27 @@ func (x *searchSearchServer) Send(m *SearchResultItem) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Search_SearchPartitions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SearchPartitionsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SearchServer).SearchPartitions(m, &searchSearchPartitionsServer{stream})
+}
+
+type Search_SearchPartitionsServer interface {
+	Send(*SearchResultItem) error
+	grpc.ServerStream
+}
+
+type searchSearchPartitionsServer struct {
+	grpc.ServerStream
+}
+
+func (x *searchSearchPartitionsServer) Send(m *SearchResultItem) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _Search_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "anndb_pb.Search",
 	HandlerType: (*SearchServer)(nil),
@@ -243,6 +378,11 @@ var _Search_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Search",
 			Handler:       _Search_Search_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SearchPartitions",
+			Handler:       _Search_SearchPartitions_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -6,9 +6,9 @@ import (
 	"errors";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/cluster";
 
 	"github.com/satori/go.uuid";
-	"google.golang.org/grpc";
 	etcdRaft "github.com/coreos/etcd/raft";
 	"github.com/coreos/etcd/raft/raftpb";
 	"github.com/golang/protobuf/proto";
@@ -18,36 +18,27 @@ import (
 var (
 	GroupAlreadyExistsError error = errors.New("Group already exists")
 	GroupNotFoundError error = errors.New("Group not found")
-	NodeAddressNotFoundError error = errors.New("Node address not found")
 )
 
 type RaftTransport struct {
 	nodeId uint64
 	address string
+	clusterConn *cluster.Conn
 
-	nodeAddresses map[uint64]string
-	nodeAddressesMu sync.RWMutex
-	nodeConns map[uint64]*grpc.ClientConn
-	nodeConnsMu sync.RWMutex
 	nodeClients map[uint64]pb.RaftTransportClient
 	nodeClientsMu sync.RWMutex
-
 	groups map[uuid.UUID]*RaftGroup
 	groupsMu sync.RWMutex
 }
 
-func NewTransport(nodeId uint64, address string) *RaftTransport {
+func NewTransport(nodeId uint64, address string, clusterConn *cluster.Conn) *RaftTransport {
 	return &RaftTransport {
 		nodeId: nodeId,
 		address: address,
+		clusterConn: clusterConn,
 
-		nodeAddresses: make(map[uint64]string),
-		nodeAddressesMu: sync.RWMutex{},
-		nodeConns: make(map[uint64]*grpc.ClientConn),
-		nodeConnsMu: sync.RWMutex{},
 		nodeClients: make(map[uint64]pb.RaftTransportClient),
 		nodeClientsMu: sync.RWMutex{},
-
 		groups: make(map[uuid.UUID]*RaftGroup),
 		groupsMu: sync.RWMutex{},
 	}
@@ -59,18 +50,6 @@ func (this *RaftTransport) NodeId() uint64 {
 
 func (this *RaftTransport) Address() string {
 	return this.address
-}
-
-func (this *RaftTransport) NodeIds() []uint64 {
-	this.nodeAddressesMu.RLock()
-	defer this.nodeAddressesMu.RUnlock()
-
-	ids := make([]uint64, 0, len(this.nodeAddresses))
-	for id, _ := range this.nodeAddresses {
-		ids = append(ids, id)
-	}
-
-	return ids
 }
 
 func (this *RaftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTransport_ProposeJoinServer) error {
@@ -91,14 +70,7 @@ func (this *RaftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTr
 		return err
 	}
 
-	currNodes := make(map[uint64]string)
-	this.nodeAddressesMu.RLock()
-	for nodeId, address := range this.nodeAddresses {
-		currNodes[nodeId] = address
-	}
-	this.nodeAddressesMu.RUnlock()
-
-	for nodeId, address := range currNodes {
+	for nodeId, address := range this.clusterConn.Nodes() {
 		if err := stream.Send(&pb.RaftNode{Id: nodeId, Address: address}); err != nil {
 			return err
 		}
@@ -165,12 +137,11 @@ func (this *RaftTransport) Send(ctx context.Context, group *RaftGroup, messages 
 }
 
 func (this *RaftTransport) addNodeAddress(nodeId uint64, address string) {
-	this.nodeAddressesMu.Lock()
-	defer this.nodeAddressesMu.Unlock()
+	this.clusterConn.AddNode(nodeId, address)
+}
 
-	if _, exists := this.nodeAddresses[nodeId]; !exists {
-		this.nodeAddresses[nodeId] = address
-	}
+func (this *RaftTransport) removeNodeAddress(nodeId uint64) {
+	this.clusterConn.RemoveNode(nodeId)
 }
 
 func (this *RaftTransport) addGroup(group *RaftGroup) error {
@@ -245,7 +216,7 @@ func (this *RaftTransport) getNodeRaftTransportClient(nodeId uint64) (pb.RaftTra
 	}
 	this.nodeClientsMu.RUnlock()
 
-	conn, err := this.getNodeConn(nodeId)
+	conn, err := this.clusterConn.Dial(nodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -255,37 +226,4 @@ func (this *RaftTransport) getNodeRaftTransportClient(nodeId uint64) (pb.RaftTra
 
 	this.nodeClients[nodeId] = pb.NewRaftTransportClient(conn)
 	return this.nodeClients[nodeId], nil
-}
-
-func (this *RaftTransport) getNodeConn(nodeId uint64) (*grpc.ClientConn, error) {
-	this.nodeConnsMu.RLock()
-	if conn, exists := this.nodeConns[nodeId]; exists {
-		this.nodeConnsMu.RUnlock()
-		return conn, nil
-	}
-	this.nodeConnsMu.RUnlock()
-
-	this.nodeAddressesMu.RLock()
-	address, exists := this.nodeAddresses[nodeId]
-	if !exists {
-		this.nodeAddressesMu.RUnlock()
-		return nil, NodeAddressNotFoundError
-	}
-	this.nodeAddressesMu.RUnlock()
-
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-
-	this.nodeConnsMu.Lock()
-	defer this.nodeConnsMu.Unlock()
-
-	if existingConn, exists := this.nodeConns[nodeId]; exists {
-		conn.Close()
-		return existingConn, nil
-	}
-
-	this.nodeConns[nodeId] = conn
-	return conn, nil
 }

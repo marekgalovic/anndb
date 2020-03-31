@@ -8,6 +8,7 @@ import (
 	"time";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/cluster";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
 	"github.com/marekgalovic/anndb/pkg/storage/wal";
 	"github.com/marekgalovic/anndb/pkg/storage";
@@ -29,7 +30,7 @@ func main() {
 	flag.StringVar(&dataDir, "data-dir", "/tmp", "Data directory")
 	flag.Parse()
 
-	db, err := badger.Open(badger.LSMOnlyOptions(path.Join(dataDir, "anndb")))
+	db, err := badger.Open(badger.LSMOnlyOptions(path.Join(dataDir, "anndb")).WithLogger(log.New()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +41,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port))
+	clusterConn := cluster.NewConn()
+	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port), clusterConn)
 
 	// Start raft zero group
 	zeroGroup, err := raft.NewRaftGroup(uuid.Nil, getZeroNodeIds(raftTransport.NodeId(), joinNodesRaw), wal.NewBadgerWAL(db, uuid.Nil), raftTransport)
@@ -49,13 +51,11 @@ func main() {
 	}
 	defer zeroGroup.Stop()
 
-	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport)
+	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport, clusterConn)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer datasetManager.Close()
-
-	log.Info(datasetManager)
 
 	// Start server
 	listener, err := net.Listen("tcp", net.JoinHostPort("", port))
@@ -67,6 +67,7 @@ func main() {
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
 	pb.RegisterDatasetManagerServer(grpcServer, services.NewDatasetManagerServer(datasetManager))
 	pb.RegisterDataManagerServer(grpcServer, services.NewDataManagerServer(datasetManager))
+	pb.RegisterSearchServer(grpcServer, services.NewSearchServer(datasetManager))
 	go grpcServer.Serve(listener)
 
 	// Join cluster

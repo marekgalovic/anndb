@@ -187,6 +187,10 @@ func (this *badgerWAL) Save(hardState raftpb.HardState, entries []raftpb.Entry, 
 	return batch.Flush()
 }
 
+func (this *badgerWAL) DeleteGroup() error {
+	return this.reset(nil)	
+}
+
 func (this *badgerWAL) entryKey(idx uint64) []byte {
 	b := make([]byte, 24)
 	copy(b[0:16], this.groupId.Bytes())

@@ -19,10 +19,12 @@ import (
 
 type partition struct {
 	id uuid.UUID
+	servingNodeIds []uint64
 	dataset *Dataset
 	index *index.Hnsw
 
 	raft *raft.RaftGroup
+	wal wal.WAL
 
 	insertNotifications *utils.Notificator
 	deleteNotifications *utils.Notificator
@@ -43,12 +45,8 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 }
 
 func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) *partition {
-	raft, err := raft.NewRaftGroup(
-		id,
-		nodeIds,
-		wal.NewBadgerWAL(raftWalDB, id),
-		raftTransport,
-	)
+	wal := wal.NewBadgerWAL(raftWalDB, id)
+	raft, err := raft.NewRaftGroup(id, nodeIds, wal, raftTransport)
 	if err != nil {
 		// TODO:
 		panic(err)
@@ -56,9 +54,11 @@ func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *b
 
 	p := &partition {
 		id: id,
+		servingNodeIds: nodeIds,
 		dataset: dataset,
 		index: newIndexFromDatasetProto(dataset.Meta()),
 		raft: raft,
+		wal: wal,
 		insertNotifications: utils.NewNotificator(),
 		deleteNotifications: utils.NewNotificator(),
 	}
@@ -72,6 +72,15 @@ func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *b
 
 func (this *partition) close() {
 	this.raft.Stop()
+}
+
+func (this *partition) deleteData() error {
+	this.raft.Stop()
+	return this.wal.DeleteGroup()
+}
+
+func (this *partition) nodeIds() []uint64 {
+	return this.servingNodeIds
 }
 
 func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
@@ -136,6 +145,10 @@ func (this *partition) remove(ctx context.Context, id uint64) error {
 	case <- ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (this *partition) search(ctx context.Context, query []float32, k uint) (index.SearchResult, error) {
+	return this.index.Search(ctx, query, k)
 }
 
 func (this *partition) process(data []byte) error {

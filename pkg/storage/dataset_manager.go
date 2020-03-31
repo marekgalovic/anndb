@@ -7,6 +7,7 @@ import (
 	"time";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
+	"github.com/marekgalovic/anndb/pkg/cluster";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
 	"github.com/marekgalovic/anndb/pkg/math";
 	"github.com/marekgalovic/anndb/pkg/utils";
@@ -25,6 +26,7 @@ type DatasetManager struct {
 	zeroGroup *raft.RaftGroup
 	raftWalDB *badger.DB
 	raftTransport *raft.RaftTransport
+	clusterConn *cluster.Conn
 
 	datasets map[uuid.UUID]*Dataset
 	datasetsMu *sync.RWMutex
@@ -33,11 +35,12 @@ type DatasetManager struct {
 	deletedNotifications *utils.Notificator
 }
 
-func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) (*DatasetManager, error) {
+func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn) (*DatasetManager, error) {
 	dm := &DatasetManager {
 		zeroGroup: zeroGroup,
 		raftWalDB: raftWalDB,
 		raftTransport: raftTransport,
+		clusterConn: clusterConn,
 
 		datasets: make(map[uuid.UUID]*Dataset),
 		datasetsMu: &sync.RWMutex{},
@@ -80,7 +83,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 	id := uuid.NewV4()
 	dataset.Id = id.Bytes()
 	dataset.Partitions = make([]*pb.Partition, dataset.GetPartitionCount())
-	partitionsNodeIds := this.getPartitionsNodeIds(this.raftTransport.NodeIds(), uint(dataset.GetPartitionCount()), uint(dataset.GetReplicationFactor()))
+	partitionsNodeIds := this.getPartitionsNodeIds(this.clusterConn.NodeIds(), uint(dataset.GetPartitionCount()), uint(dataset.GetReplicationFactor()))
 	for i := 0; i < int(dataset.GetPartitionCount()); i++ {
 		dataset.Partitions[i] = &pb.Partition {
 			Id: uuid.NewV4().Bytes(),
@@ -174,7 +177,7 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 		return nil
 	}
 
-	this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport)
+	this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport, this.clusterConn)
 	if err != nil {
 		this.createdNotifications.Notify(id, err)
 		return nil
@@ -183,16 +186,23 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 	return nil
 }
 
-func (this *DatasetManager) deleteDataset(dataset *pb.Dataset) error {
-	id, err := uuid.FromBytes(dataset.GetId())
+func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
+	id, err := uuid.FromBytes(datasetProto.GetId())
 	if err != nil {
 		return err
 	}
 
 	this.datasetsMu.Lock()
 	defer this.datasetsMu.Unlock()
-	if _, exists := this.datasets[id]; !exists {
+	dataset, exists := this.datasets[id]
+
+	if !exists {
 		this.deletedNotifications.Notify(id, DatasetNotFoundErr)
+		return nil
+	}
+
+	if err := dataset.deleteData(); err != nil {
+		this.deletedNotifications.Notify(id, err)
 		return nil
 	}
 
