@@ -42,28 +42,27 @@ func worker(ctx context.Context, index *index.Hnsw, tasks <- chan int64) {
 }
 
 func main() {
-	for numThreads := 16; numThreads <= runtime.NumCPU(); numThreads++ {
-		ctx, cancel := context.WithCancel(context.Background())
+	numThreads := runtime.NumCPU()
+	ctx, cancel := context.WithCancel(context.Background())
 
-		idx := index.NewHnsw(uint(dim), space.NewEuclidean());
-		queue := make(chan int64)
-		for i := 0; i < numThreads; i++ {
-			go worker(ctx, idx, queue)
-		}
-
-		startAt := time.Now()
-		n := 100000
-		for i := 0; i < n; i++ {
-			if (i > 100) && (math.RandomUniform() <= 0.2) {
-				queue <- -rand.Int63n(int64(i-100))
-			} else {
-				queue <- int64(i)
-			}
-		}
-
-		time.Sleep(1 * time.Second)
-		cancel()
-
-		log.Infof("[%d, %.1f],", numThreads, float64(n) / float64(time.Since(startAt).Seconds()))
+	idx := index.NewHnsw(uint(dim), space.NewEuclidean());
+	queue := make(chan int64)
+	for i := 0; i < numThreads; i++ {
+		go worker(ctx, idx, queue)
 	}
+
+	startAt := time.Now()
+	n := 10000
+	for i := 0; i < n; i++ {
+		if (i > 100) && (math.RandomUniform() <= 0.2) {
+			queue <- -rand.Int63n(int64(i-100))
+		} else {
+			queue <- int64(i)
+		}
+	}
+
+	time.Sleep(5 * time.Second)
+	cancel()
+
+	log.Infof("[%d, %.1f],", numThreads, float64(n) / float64(time.Since(startAt).Seconds()))
 }	

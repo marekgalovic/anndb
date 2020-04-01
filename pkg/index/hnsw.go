@@ -25,7 +25,7 @@ var (
 type Hnsw struct {
     size uint
     space space.Space
-	config hnswConfig
+	config *hnswConfig
 
     len uint64
     vertices [VERTICES_MAP_SHARD_COUNT]map[uint64]*hnswVertex
@@ -115,8 +115,8 @@ func (this *Hnsw) Insert(id uint64, value math.Vector, vertexLevel int) error {
 
 func (this *Hnsw) Get(id uint64) (math.Vector, error) {
     m, mu := this.getVerticesShard(id)
-    defer mu.RUnlock()
     mu.RLock()
+    defer mu.RUnlock()
 
     if vertex, exists := m[id]; exists {
         return vertex.vector, nil

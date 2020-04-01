@@ -31,33 +31,33 @@ func newSpace() space {
     return space {impl: nativeSpaceImpl{}}
 }
 
-type euclideanSpace struct { space }
+type Euclidean struct { space }
 
-type manhattanSpace struct { space }
+type Manhattan struct { space }
 
-type cosineSpace struct { space }
+type Cosine struct { space }
 
 func NewEuclidean() Space {
-    return &euclideanSpace{newSpace()}
+    return &Euclidean{newSpace()}
 }
 
-func (this *euclideanSpace) Distance(a, b math.Vector) float32 {
+func (this *Euclidean) Distance(a, b math.Vector) float32 {
     return this.impl.EuclideanDistance(a, b)
 }
 
 func NewManhattan() Space {
-    return &manhattanSpace{newSpace()}
+    return &Manhattan{newSpace()}
 }
 
-func (this *manhattanSpace) Distance(a, b math.Vector) float32 {
+func (this *Manhattan) Distance(a, b math.Vector) float32 {
     return this.impl.ManhattanDistance(a, b)
 }
 
 func NewCosine() Space {
-    return &cosineSpace{newSpace()}
+    return &Cosine{newSpace()}
 }
 
-func (this *cosineSpace) Distance(a, b math.Vector) float32 {
+func (this *Cosine) Distance(a, b math.Vector) float32 {
     return this.impl.CosineDistance(a, b)
 }
 

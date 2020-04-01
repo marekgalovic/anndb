@@ -1,6 +1,7 @@
 package math
 
 import (
+    "io";
     "sort";
     "bytes";
     "encoding/binary";
@@ -17,6 +18,24 @@ func (v Vector) Less(i, j int) bool { return v[i] < v[j] }
 func (v Vector) Sort() Vector {
     sort.Sort(v)
     return v
+}
+
+func (v Vector) Save(w io.Writer) error {
+    for _, val := range v {
+        if err := binary.Write(w, binary.BigEndian, val); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+func (v Vector) Load(r io.Reader) error {
+    for i := 0; i < len(v); i++ {
+        if err := binary.Read(r, binary.BigEndian, &v[i]); err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 func assertSameDim(i, j *Vector) {
