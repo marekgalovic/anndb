@@ -182,6 +182,7 @@ func (this *partition) process(data []byte) error {
 	case pb.PartitionChangeType_DeleteValue:
 		return this.deleteValue(change.GetId())
 	}
+
 	return nil
 }
 

@@ -86,16 +86,15 @@ func generateRandomIndex(dim, size int, space space.Space) *Hnsw {
 func TestHnswSaveAndLoad(t *testing.T) {
     index := generateRandomIndex(128, 1000, space.NewEuclidean())
 
-    var b []byte
-    buf := bytes.NewBuffer(b)
-    err := index.Save(buf, true)
+    var buf bytes.Buffer
+    err := index.Save(&buf, true)
     assert.Nil(t, err)
     if err != nil {
         return
     }
 
     otherIndex := NewHnsw(128, space.NewEuclidean())
-    err = index.Load(buf, true)
+    err = otherIndex.Load(&buf, true)
     assert.Nil(t, err)
     if err != nil {
         return

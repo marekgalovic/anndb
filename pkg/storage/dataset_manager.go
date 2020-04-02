@@ -10,6 +10,7 @@ import (
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/cluster";
 	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	"github.com/marekgalovic/anndb/pkg/math";
 	"github.com/marekgalovic/anndb/pkg/utils";
 
 	"github.com/satori/go.uuid";
@@ -223,7 +224,7 @@ func (this *DatasetManager) getPartitionsNodeIds(nodeIds []uint64, partitionCoun
 			nodeIds[i], nodeIds[j] = nodeIds[j], nodeIds[i]
 		})
 		
-		partitionsNodeIds[i] = nodeIds[:replicationFactor]
+		partitionsNodeIds[i] = nodeIds[:math.MinInt(len(nodeIds), int(replicationFactor))]
 	}
 
 	return partitionsNodeIds
@@ -245,6 +246,26 @@ func (this *DatasetManager) process(data []byte) error {
 }
 
 func (this *DatasetManager) processSnapshot(data []byte) error {
+	this.datasetsMu.Lock()
+	defer this.datasetsMu.Unlock()
+
+	var dmSnapshot pb.DatasetManagerSnapshot
+	if err := proto.Unmarshal(data, &dmSnapshot); err != nil {
+		return err
+	}
+
+	for _, dataset := range dmSnapshot.Datasets {
+		id, err := uuid.FromBytes(dataset.GetId())
+		if err != nil {
+			return err
+		}
+		if _, exists := this.datasets[id]; !exists {
+			this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport, this.clusterConn)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

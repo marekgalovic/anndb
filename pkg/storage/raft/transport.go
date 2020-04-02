@@ -124,7 +124,6 @@ func (this *RaftTransport) Send(ctx context.Context, group *RaftGroup, messages 
 		}
 
 		if _, err := client.Receive(ctx, payload); err != nil {
-			// log.Warn(err)
 			group.reportUnreachable(nodeId)
 			if containsSnapshot {
 				group.reportSnapshot(nodeId, etcdRaft.SnapshotFailure)

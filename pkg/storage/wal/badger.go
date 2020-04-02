@@ -5,6 +5,7 @@ import (
 	"math";
 	"encoding/binary";
 	"bytes";
+	"sync";
 
 	"github.com/satori/go.uuid";
 	etcdRaft "github.com/coreos/etcd/raft";
@@ -14,15 +15,22 @@ import (
 )
 
 
-var badgerRaftIdKey []byte = []byte("raftid")
+var (
+	badgerRaftIdKey []byte = []byte("raftid")
+	cacheSnapshotKey string = "snapshot"
+	cacheFirstIndexKey string = "firstindex"
+	cacheLastIndexKey string = "lastindex"
+)
 
 var (
 	entryNotFoundErr error = errors.New("Entry not found")
+	EmptyConfStateErr error = errors.New("Empty ConfState")
 )
 
 type badgerWAL struct {
-	db *badger.DB
 	groupId uuid.UUID
+	db *badger.DB
+	cache *sync.Map
 }
 
 func GetBadgerRaftId(db *badger.DB) (uint64, error) {
@@ -51,8 +59,9 @@ func SetBadgerRaftId(db *badger.DB, id uint64) error {
 
 func NewBadgerWAL(db *badger.DB, groupId uuid.UUID) *badgerWAL {
 	wal := &badgerWAL{
-		db: db,
 		groupId: groupId,
+		db: db,
+		cache: new(sync.Map),
 	}
 
 	_, err := wal.FirstIndex();
@@ -73,7 +82,7 @@ func (this *badgerWAL) InitialState() (raftpb.HardState, raftpb.ConfState, error
 
 	snapshot, err := this.Snapshot()
 	if err != nil {
-		return raftpb.HardState{}, raftpb.ConfState{}, err	
+		return hardState, raftpb.ConfState{}, err	
 	}
 
 	return hardState, snapshot.Metadata.ConfState, nil
@@ -123,20 +132,41 @@ func (this *badgerWAL) Term(idx uint64) (uint64, error) {
 }
 
 func (this *badgerWAL) LastIndex() (uint64, error) {
+	if v, exists := this.cache.Load(cacheLastIndexKey); exists {
+		if idx, ok := v.(uint64); ok {
+			return idx, nil
+		}
+	}
 	return this.seekEntry(nil, math.MaxUint64, true)
 }
 
 func (this *badgerWAL) FirstIndex() (uint64, error) {
+	// Try cache
+	if v, exists := this.cache.Load(cacheSnapshotKey); exists {
+		if snapshot, ok := v.(*raftpb.Snapshot); ok && !etcdRaft.IsEmptySnap(*snapshot) {
+			return snapshot.Metadata.Index + 1, nil
+		}
+	}
+	if v, exists := this.cache.Load(cacheFirstIndexKey); exists {
+		if idx, ok := v.(uint64); ok {
+			return idx, nil
+		}
+	}
+
 	index, err := this.seekEntry(nil, 0, false)
 	if err != nil {
 		return 0, err
 	}
+	this.cache.Store(cacheFirstIndexKey, index + 1)
 	return index + 1, nil
 }
 
 func (this *badgerWAL) Snapshot() (raftpb.Snapshot, error) {
-	log.Warn("Storage snapshot called")
-
+	if v, exists := this.cache.Load(cacheSnapshotKey); exists {
+		if snapshot, ok := v.(*raftpb.Snapshot); ok && !etcdRaft.IsEmptySnap(*snapshot) {
+			return *snapshot, nil
+		}
+	}
 	var snapshot raftpb.Snapshot
 	err := this.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(this.snapshotKey())
@@ -191,7 +221,7 @@ func (this *badgerWAL) Save(hardState raftpb.HardState, entries []raftpb.Entry, 
 
 func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, data []byte) error {
 	if confState == nil {
-		return nil
+		return EmptyConfStateErr
 	}
 	firstIndex, err := this.FirstIndex()
 	if err != nil {
@@ -302,6 +332,8 @@ func (this *badgerWAL) getEntries(lo, hi, maxSize uint64) ([]raftpb.Entry, error
 		startKey := this.entryKey(lo)
 		endKey := this.entryKey(hi)
 
+		var size uint64 = 0
+		first := true
 		for iterator.Seek(startKey); iterator.Valid(); iterator.Next() {
 			item := iterator.Item()
 			var entry raftpb.Entry
@@ -315,6 +347,11 @@ func (this *badgerWAL) getEntries(lo, hi, maxSize uint64) ([]raftpb.Entry, error
 			if bytes.Compare(item.Key(), endKey) >= 0 {
 				break
 			}
+			size += uint64(entry.Size())
+			if size > maxSize && !first {
+				break
+			}
+			first = false
 			entries = append(entries, entry)
 		}
 		return nil
@@ -358,6 +395,7 @@ func (this *badgerWAL) writeEntries(batch *badger.WriteBatch, entries []raftpb.E
 	}
 
 	lastEntryIndex := entries[len(entries)-1].Index
+	this.cache.Store(cacheLastIndexKey, lastEntryIndex)
 	if lastIndex > lastEntryIndex {
 		return this.deleteEntriesFromIndex(batch, lastEntryIndex + 1)
 	}
@@ -386,7 +424,6 @@ func (this *badgerWAL) writeSnapshot(batch *badger.WriteBatch, snapshot raftpb.S
 	if err != nil {
 		return err
 	}
-
 	err = batch.Set(this.snapshotKey(), snapshotData)
 	if err != nil {
 		return err
@@ -397,11 +434,18 @@ func (this *badgerWAL) writeSnapshot(batch *badger.WriteBatch, snapshot raftpb.S
 	if err != nil {
 		return err
 	}
-
 	err = batch.Set(this.entryKey(entry.Index), entryData)
 	if err != nil {
 		return err
 	}
+
+	if v, exists := this.cache.Load(cacheLastIndexKey); exists {
+		if v.(uint64) < entry.Index {
+			this.cache.Store(cacheLastIndexKey, entry.Index)
+		}
+	}
+
+	this.cache.Store(cacheSnapshotKey, &snapshot)
 
 	return nil
 }
@@ -482,6 +526,8 @@ func (this *badgerWAL) deleteKeys(batch *badger.WriteBatch, keys [][]byte) error
 }
 
 func (this *badgerWAL) reset(entries []raftpb.Entry) error {
+	this.cache = new(sync.Map)
+
 	batch := this.db.NewWriteBatch()
 	defer batch.Cancel()
 

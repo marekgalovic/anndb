@@ -39,7 +39,7 @@ type RaftGroup struct {
 	raftConfState *raftpb.ConfState
 	raftLeaderId uint64
 	wal wal.WAL
-	log etcdRaft.Logger
+	log *log.Entry
 }
 
 func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
@@ -98,7 +98,7 @@ func (this *RaftGroup) Stop() {
 	this.ctxCancel()
 
 	if err := this.transport.removeGroup(this.id); err != nil {
-		log.Error(err)
+		this.log.Error(err)
 	}
 }
 
@@ -181,11 +181,10 @@ func (this *RaftGroup) run() {
 			if !this.isLeader() {
 				continue
 			}
-			if err := this.trySnapshot(lastCommittedIdx); err != nil {
-				log.Warn(err)
+			if err := this.trySnapshot(lastCommittedIdx, 0); err != nil {
+				this.log.Warnf("Snapshot failed: %v", err)
 				continue
 			}
-			this.log.Infof("Created snapshot: %d", lastCommittedIdx)
 		case <- ticker.C:
 			this.raft.Tick()
 		case rd := <- this.raft.Ready():
@@ -193,13 +192,13 @@ func (this *RaftGroup) run() {
 				this.raftLeaderId = atomic.LoadUint64(&rd.SoftState.Lead)
 			}
 			if err := this.wal.Save(rd.HardState, rd.Entries, rd.Snapshot); err != nil {
-				log.Fatal(err)
+				this.log.Fatal(err)
 			}
 			this.transport.Send(this.ctx, this, rd.Messages);
 			if !etcdRaft.IsEmptySnap(rd.Snapshot) {
-				this.log.Infof("Process snapshot: %d", rd.Snapshot.Metadata.Index)
+				this.log.Infof("Process snapshot: %d\n", rd.Snapshot.Metadata.Index)
 				if err := this.processSnapshotFn(rd.Snapshot.Data); err != nil {
-					log.Fatal(err)
+					this.log.Fatal(err)
 				}
 			}
 			for _, entry := range rd.CommittedEntries {
@@ -208,7 +207,7 @@ func (this *RaftGroup) run() {
 				} else if entry.Type == raftpb.EntryNormal {
 					if len(entry.Data) > 0 {
 						if err := this.processFn(entry.Data); err != nil {
-							log.Fatal(err)
+							this.log.Fatal(err)
 						}
 					}
 				}
@@ -216,6 +215,7 @@ func (this *RaftGroup) run() {
 			}
 			this.raft.Advance()
 		case <- this.ctx.Done():
+			this.log.Info("Stop Raft")
 			return
 		}
 	}
@@ -228,7 +228,7 @@ func (this *RaftGroup) isLeader() bool {
 func (this *RaftGroup) receive(messages []raftpb.Message) error {
 	for _, msg := range messages {
 		if err := this.raft.Step(this.ctx, msg); err != nil {
-			log.Error(err)
+			this.log.Error(err)
 		}
 	}
 	return nil
@@ -239,6 +239,14 @@ func (this *RaftGroup) proposeJoin(nodeId uint64, address string) error {
 	cc.Type = raftpb.ConfChangeAddNode
 	cc.NodeID = nodeId
 	cc.Context = []byte(address)
+
+	return this.raft.ProposeConfChange(this.ctx, cc)
+}
+
+func (this *RaftGroup) proposeLeave(nodeId uint64) error {
+	var cc raftpb.ConfChange
+	cc.Type = raftpb.ConfChangeRemoveNode
+	cc.NodeID = nodeId
 
 	return this.raft.ProposeConfChange(this.ctx, cc)
 }
@@ -271,7 +279,7 @@ func (this *RaftGroup) processConfChange(entry raftpb.Entry) error {
 	return nil
 }
 
-func (this *RaftGroup) trySnapshot(lastCommittedIdx uint64) error {
+func (this *RaftGroup) trySnapshot(lastCommittedIdx, skip uint64) error {
 	if this.snapshotFn == nil {
 		return nil
 	}
@@ -280,7 +288,7 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx uint64) error {
 	if err != nil {
 		return err
 	}
-	if lastCommittedIdx <= existing.Metadata.Index {
+	if lastCommittedIdx <= existing.Metadata.Index + skip {
 		return nil
 	}
 
@@ -291,8 +299,6 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx uint64) error {
 	if len(snapshotData) == 0 {
 		return EmptySnapshotDataErr
 	}
-
-	this.log.Info("WAL Create snapshot")
 
 	return this.wal.CreateSnapshot(lastCommittedIdx, this.raftConfState, snapshotData)
 }

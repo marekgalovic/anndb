@@ -123,7 +123,7 @@ func (this *Dataset) Search(ctx context.Context, query math.Vector, k uint) (ind
 	}
 
 	sort.Sort(result)
-	return result[:k], nil
+	return result[:math.MinInt(int(k), len(result))], nil
 }
 
 func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.UUID, query math.Vector, k uint) (index.SearchResult, error) {
@@ -167,7 +167,7 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 	}
 
 	sort.Sort(result)
-	return result[:k], nil
+	return result[:math.MinInt(int(k), len(result))], nil
 }
 
 func (this *Dataset) deleteData() error {
