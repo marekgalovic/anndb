@@ -52,6 +52,12 @@ func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTran
 	if err := zeroGroup.RegisterProcessFn(dm.process); err != nil {
 		return nil, err
 	}
+	if err := zeroGroup.RegisterProcessSnapshotFn(dm.processSnapshot); err != nil {
+		return nil, err
+	}
+	if err := zeroGroup.RegisterSnapshotFn(dm.snapshot); err != nil {
+		return nil, err
+	}
 
 	return dm, nil
 }
@@ -163,21 +169,6 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
-func (this *DatasetManager) process(data []byte) error {
-	var change pb.DatasetsChange
-	if err := proto.Unmarshal(data, &change); err != nil {
-		return err
-	}
-
-	switch change.Type {
-	case pb.DatasetsChangeType_CreateDataset:
-		return this.createDataset(change.Dataset)
-	case pb.DatasetsChangeType_DeleteDataset:
-		return this.deleteDataset(change.Dataset)
-	}
-	return nil
-}
-
 func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 	id, err := uuid.FromBytes(dataset.GetId())
 	if err != nil {
@@ -236,4 +227,37 @@ func (this *DatasetManager) getPartitionsNodeIds(nodeIds []uint64, partitionCoun
 	}
 
 	return partitionsNodeIds
+}
+
+func (this *DatasetManager) process(data []byte) error {
+	var change pb.DatasetsChange
+	if err := proto.Unmarshal(data, &change); err != nil {
+		return err
+	}
+
+	switch change.Type {
+	case pb.DatasetsChangeType_CreateDataset:
+		return this.createDataset(change.Dataset)
+	case pb.DatasetsChangeType_DeleteDataset:
+		return this.deleteDataset(change.Dataset)
+	}
+	return nil
+}
+
+func (this *DatasetManager) processSnapshot(data []byte) error {
+	return nil
+}
+
+func (this *DatasetManager) snapshot() ([]byte, error) {
+	this.datasetsMu.RLock()
+	defer this.datasetsMu.RUnlock()
+
+	i := 0
+	datasets := make([]*pb.Dataset, len(this.datasets))
+	for _, dataset := range this.datasets {
+		datasets[i] = dataset.Meta()
+		i++
+	}
+
+	return proto.Marshal(&pb.DatasetManagerSnapshot{Datasets: datasets})
 }

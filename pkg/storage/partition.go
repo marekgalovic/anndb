@@ -3,6 +3,7 @@ package storage
 import (
 	"context";
 	"time";
+	"bytes";
 
 	pb "github.com/marekgalovic/anndb/pkg/protobuf";
 	"github.com/marekgalovic/anndb/pkg/math";
@@ -15,6 +16,7 @@ import (
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
 	badger "github.com/dgraph-io/badger/v2";
+	log "github.com/sirupsen/logrus";
 )
 
 type partition struct {
@@ -48,8 +50,7 @@ func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *b
 	wal := wal.NewBadgerWAL(raftWalDB, id)
 	raft, err := raft.NewRaftGroup(id, nodeIds, wal, raftTransport)
 	if err != nil {
-		// TODO:
-		panic(err)
+		log.Fatal(err)
 	}
 
 	p := &partition {
@@ -64,7 +65,13 @@ func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *b
 	}
 
 	if err := raft.RegisterProcessFn(p.process); err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	if err := raft.RegisterProcessSnapshotFn(p.processSnapshot); err != nil {
+		log.Fatal(err)
+	}
+	if err := raft.RegisterSnapshotFn(p.snapshot); err != nil {
+		log.Fatal(err)
 	}
 
 	return p
@@ -151,6 +158,18 @@ func (this *partition) search(ctx context.Context, query []float32, k uint) (ind
 	return this.index.Search(ctx, query, k)
 }
 
+func (this *partition) insertValue(id uint64, value []float32, level int) error {
+	err := this.index.Insert(id, value, level);
+	this.insertNotifications.Notify(id, err)
+	return nil
+}
+
+func (this *partition) deleteValue(id uint64) error {
+	err := this.index.Remove(id);
+	this.deleteNotifications.Notify(id, err)
+	return nil
+}
+
 func (this *partition) process(data []byte) error {
 	var change pb.PartitionChange
 	if err := proto.Unmarshal(data, &change); err != nil {
@@ -166,14 +185,14 @@ func (this *partition) process(data []byte) error {
 	return nil
 }
 
-func (this *partition) insertValue(id uint64, value []float32, level int) error {
-	err := this.index.Insert(id, value, level);
-	this.insertNotifications.Notify(id, err)
-	return nil
+func (this *partition) processSnapshot(data []byte) error {
+	return this.index.Load(bytes.NewBuffer(data), false)
 }
 
-func (this *partition) deleteValue(id uint64) error {
-	err := this.index.Remove(id);
-	this.deleteNotifications.Notify(id, err)
-	return nil
+func (this *partition) snapshot() ([]byte, error) {
+	var buf bytes.Buffer
+	if err := this.index.Save(&buf, false); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

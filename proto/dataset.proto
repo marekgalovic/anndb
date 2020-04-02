@@ -67,3 +67,7 @@ message PartitionChange {
 	repeated float value = 3;
 	int32 level = 4;
 }
+
+message DatasetManagerSnapshot {
+	repeated Dataset datasets = 1;
+}

@@ -135,6 +135,8 @@ func (this *badgerWAL) FirstIndex() (uint64, error) {
 }
 
 func (this *badgerWAL) Snapshot() (raftpb.Snapshot, error) {
+	log.Warn("Storage snapshot called")
+
 	var snapshot raftpb.Snapshot
 	err := this.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(this.snapshotKey())
@@ -181,6 +183,45 @@ func (this *badgerWAL) Save(hardState raftpb.HardState, entries []raftpb.Entry, 
 		return err
 	}
 	if err := this.writeSnapshot(batch, snapshot); err != nil {
+		return err
+	}
+
+	return batch.Flush()
+}
+
+func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, data []byte) error {
+	if confState == nil {
+		return nil
+	}
+	firstIndex, err := this.FirstIndex()
+	if err != nil {
+		return err
+	}
+	if idx < firstIndex {
+		return etcdRaft.ErrSnapOutOfDate
+	}
+
+	var entry raftpb.Entry
+	if _, err := this.seekEntry(&entry, idx, false); err != nil {
+		return err
+	}
+	if idx != entry.Index {
+		return entryNotFoundErr
+	}
+
+	var snapshot raftpb.Snapshot
+	snapshot.Metadata.Index = idx
+	snapshot.Metadata.Term = entry.Term
+	snapshot.Metadata.ConfState = *confState
+	snapshot.Data = data
+
+	batch := this.db.NewWriteBatch()
+	defer batch.Cancel()
+
+	if err := this.writeSnapshot(batch, snapshot); err != nil {
+		return err
+	}
+	if err := this.deleteEntriesUntilIndex(batch, snapshot.Metadata.Index); err != nil {
 		return err
 	}
 
@@ -379,6 +420,43 @@ func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx 
 
 		for iterator.Seek(startKey); iterator.Valid(); iterator.Next() {
 			keys = append(keys, iterator.Item().Key())
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return this.deleteKeys(batch, keys)
+}
+
+func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilIdx uint64) error {
+	var keys [][]byte
+	err := this.db.View(func (txn *badger.Txn) error {
+		startKey := this.entryKey(0)
+
+		iterOpt := badger.DefaultIteratorOptions
+		iterOpt.PrefetchValues = false
+		iterOpt.Prefix = this.entryPrefix()
+
+		iterator := txn.NewIterator(iterOpt)
+		defer iterator.Close()
+
+		var index uint64
+		first := true
+		for iterator.Seek(startKey); iterator.Valid(); iterator.Next() {
+			item := iterator.Item()
+			index = this.parseIndex(item.Key())
+			if first {
+				if untilIdx <= index {
+					return etcdRaft.ErrCompacted
+				}
+				first = false
+			}
+			if index >= untilIdx {
+				break
+			}
+			keys = append(keys, item.Key())
 		}
 		return nil
 	})
