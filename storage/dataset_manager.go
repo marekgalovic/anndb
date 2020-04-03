@@ -7,11 +7,11 @@ import (
 	"time";
 	"math/rand"
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/cluster";
-	"github.com/marekgalovic/anndb/pkg/storage/raft";
-	"github.com/marekgalovic/anndb/pkg/math";
-	"github.com/marekgalovic/anndb/pkg/utils";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/cluster";
+	"github.com/marekgalovic/anndb/storage/raft";
+	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/utils";
 
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";

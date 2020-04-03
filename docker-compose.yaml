@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  anndb-1:
+    image: anndb-server
+    ports:
+      - "6000:6000"
+    environment:
+      - ANNDB_PORT=6000
+  anndb-2:
+    image: anndb-server
+    ports:
+      - "6001:6001"
+    environment:
+      - ANNDB_PORT=6001
+      - ANNDB_JOIN=anndb-1:6000
+    depends_on:
+      - anndb-1
+  anndb-3:
+    image: anndb-server
+    ports:
+      - "6002:6002"
+    environment:
+      - ANNDB_PORT=6002
+      - ANNDB_JOIN=anndb-1:6000
+    depends_on:
+      - anndb-1

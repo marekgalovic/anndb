@@ -5,13 +5,13 @@ import (
 	"time";
 	"bytes";
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/math";
-	"github.com/marekgalovic/anndb/pkg/index";
-	"github.com/marekgalovic/anndb/pkg/index/space";
-	"github.com/marekgalovic/anndb/pkg/storage/raft";
-	"github.com/marekgalovic/anndb/pkg/storage/wal";
-	"github.com/marekgalovic/anndb/pkg/utils";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/index";
+	"github.com/marekgalovic/anndb/index/space";
+	"github.com/marekgalovic/anndb/storage/raft";
+	"github.com/marekgalovic/anndb/storage/wal";
+	"github.com/marekgalovic/anndb/utils";
 
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";

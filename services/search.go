@@ -1,8 +1,8 @@
 package services
 
 import (
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/storage";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/storage";
 
 	"github.com/satori/go.uuid";
 )

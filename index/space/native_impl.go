@@ -1,7 +1,7 @@
 package space
 
 import (
-	"github.com/marekgalovic/anndb/pkg/math";
+	"github.com/marekgalovic/anndb/math";
 )
 
 type nativeSpaceImpl struct {}

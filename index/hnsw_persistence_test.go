@@ -7,8 +7,8 @@ import (
     "sync/atomic";
     "math/rand";
 
-    "github.com/marekgalovic/anndb/pkg/math";
-    "github.com/marekgalovic/anndb/pkg/index/space";
+    "github.com/marekgalovic/anndb/math";
+    "github.com/marekgalovic/anndb/index/space";
 
     "github.com/stretchr/testify/assert";
 )

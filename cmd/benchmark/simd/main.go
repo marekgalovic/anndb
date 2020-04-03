@@ -2,20 +2,12 @@ package main
 
 import (
 	"time";
-	"github.com/marekgalovic/anndb/pkg/simd/avx2";
-	"github.com/marekgalovic/anndb/pkg/index";
+	"github.com/marekgalovic/anndb/simd/avx";
+	"github.com/marekgalovic/anndb/simd/sse";
 	log "github.com/sirupsen/logrus";
 )
 
 func main() {
-	// a := [8]float32{}
-	// b := [8]float32{}
-	// for i := 0; i < 8; i++ {
-	// 	a[i] = float32(i)
-	// 	b[i] = float32(i * 2)
-	// }
-
-	// log.Info(simd.SubtractAndSquare(a, b))
 	n := 512
 	a := make([]float32, n)
 	b := make([]float32, n)
@@ -24,18 +16,24 @@ func main() {
 		b[i] = float32(i*2)
 	}
 
-	log.Info(avx2.EuclideanDistance(a, b))
-	log.Info(index.EuclideanDistance(a, b))
+	log.Info(avx.EuclideanDistance(a, b))
+	// log.Info(index.EuclideanDistance(a, b))
 
-	loops := 100000
+	loops := 1000000
 	t := time.Now()
 	for i := 0; i < loops; i++ {
-		avx2.EuclideanDistance(a, b)
+		avx.EuclideanDistance(a, b)
 	}
-	log.Infof("GO Vectorized: %.4fms", time.Since(t).Seconds() * 1000)
+	log.Infof("GO Vectorized - AVX: %.4fms", time.Since(t).Seconds() * 1000)
+
 	t = time.Now()
 	for i := 0; i < loops; i++ {
-		index.EuclideanDistance(a, b)
+		sse.EuclideanDistance(a, b)
 	}
-	log.Infof("GO Native: %.4fms", time.Since(t).Seconds() * 1000)
+	log.Infof("GO Vectorized - SSE: %.4fms", time.Since(t).Seconds() * 1000)
+	// t = time.Now()
+	// for i := 0; i < loops; i++ {
+	// 	index.EuclideanDistance(a, b)
+	// }
+	// log.Infof("GO Native: %.4fms", time.Since(t).Seconds() * 1000)
 }

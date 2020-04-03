@@ -5,8 +5,8 @@ import (
 	"sync";
 	"errors";
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/cluster";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/cluster";
 
 	"github.com/satori/go.uuid";
 	etcdRaft "github.com/coreos/etcd/raft";

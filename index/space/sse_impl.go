@@ -1,8 +1,8 @@
 package space
 
 import (
-	"github.com/marekgalovic/anndb/pkg/math";
-	"github.com/marekgalovic/anndb/pkg/simd/sse";
+	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/simd/sse";
 )
 
 type sseSpaceImpl struct {}

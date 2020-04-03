@@ -8,8 +8,8 @@ import (
 	"errors"
 	"sync/atomic";
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/storage/wal";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/storage/wal";
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";

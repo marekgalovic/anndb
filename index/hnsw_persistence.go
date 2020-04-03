@@ -7,8 +7,8 @@ import (
 	"sync/atomic";
 	"unsafe";
 
-	"github.com/marekgalovic/anndb/pkg/math";
-	"github.com/marekgalovic/anndb/pkg/index/space";
+	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/index/space";
 )
 
 var (

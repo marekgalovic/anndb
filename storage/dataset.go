@@ -8,11 +8,11 @@ import (
 	"sort";
 	"io";
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/cluster";
-	"github.com/marekgalovic/anndb/pkg/index";
-	"github.com/marekgalovic/anndb/pkg/math";
-	"github.com/marekgalovic/anndb/pkg/storage/raft";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/cluster";
+	"github.com/marekgalovic/anndb/index";
+	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/storage/raft";
 	
 	"github.com/satori/go.uuid";
 	badger "github.com/dgraph-io/badger/v2";

@@ -7,9 +7,9 @@ import (
     "sync/atomic";
     "unsafe";
 
-    "github.com/marekgalovic/anndb/pkg/math";
-    "github.com/marekgalovic/anndb/pkg/index/space";
-    "github.com/marekgalovic/anndb/pkg/utils";
+    "github.com/marekgalovic/anndb/math";
+    "github.com/marekgalovic/anndb/index/space";
+    "github.com/marekgalovic/anndb/utils";
 
     // log "github.com/sirupsen/logrus";
 )

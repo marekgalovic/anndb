@@ -3,7 +3,7 @@ package index
 import (
     "sync";
     
-    "github.com/marekgalovic/anndb/pkg/math";
+    "github.com/marekgalovic/anndb/math";
 )
 
 type hnswEdgeSet map[*hnswVertex]float32

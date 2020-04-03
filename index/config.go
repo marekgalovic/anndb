@@ -4,7 +4,7 @@ import (
     "io";
     "encoding/binary";
 
-    "github.com/marekgalovic/anndb/pkg/math";
+    "github.com/marekgalovic/anndb/math";
 )
 
 var hnswSearchAlgorithmNames = [...]string {

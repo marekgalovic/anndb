@@ -7,13 +7,13 @@ import (
 	"path";
 	"time";
 
-	pb "github.com/marekgalovic/anndb/pkg/protobuf";
-	"github.com/marekgalovic/anndb/pkg/cluster";
-	"github.com/marekgalovic/anndb/pkg/storage/raft";
-	"github.com/marekgalovic/anndb/pkg/storage/wal";
-	"github.com/marekgalovic/anndb/pkg/storage";
-	"github.com/marekgalovic/anndb/pkg/services";
-	"github.com/marekgalovic/anndb/pkg/utils";
+	pb "github.com/marekgalovic/anndb/protobuf";
+	"github.com/marekgalovic/anndb/cluster";
+	"github.com/marekgalovic/anndb/storage/raft";
+	"github.com/marekgalovic/anndb/storage/wal";
+	"github.com/marekgalovic/anndb/storage";
+	"github.com/marekgalovic/anndb/services";
+	"github.com/marekgalovic/anndb/utils";
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
