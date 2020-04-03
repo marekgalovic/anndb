@@ -28,6 +28,7 @@ func (this *memoryWAL) Save(hs raftpb.HardState, es []raftpb.Entry, snap raftpb.
 	return nil
 }
 
-func (this *memoryWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, data []byte) error {
+func (this *memoryWAL) DeleteGroup() error {
+	this = &memoryWAL{etcdRaft.NewMemoryStorage()}
 	return nil
 }

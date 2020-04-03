@@ -18,10 +18,11 @@ import (
 	log "github.com/sirupsen/logrus";
 )
 
+const snapshotOffset uint64 = 100
+
 var (
 	ProcessFnAlreadyRegisteredErr error = errors.New("ProcessFn already registered")
 	SnapshotFnAlreadyRegisteredErr error = errors.New("SnapshotFn already registered")
-	EmptySnapshotDataErr error = errors.New("Empty snapshot data")
 )
 
 type ProcessFn func([]byte) error
@@ -43,15 +44,9 @@ type RaftGroup struct {
 	log *log.Entry
 }
 
-func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
-	logger := log.WithFields(log.Fields{
-    	"node_id": fmt.Sprintf("%16x", transport.nodeId),
-    	"group_id": id.String(),
-    })
-
-	ctx, ctxCancel := context.WithCancel(context.Background())
+func startRaftNode(id uint64, nodeIds []uint64, storage wal.WAL, logger *log.Entry) (etcdRaft.Node, error) {
 	raftConfig := &etcdRaft.Config {
-	    ID: transport.nodeId,
+	    ID: id,
 	    ElectionTick: 10,
 	    HeartbeatTick: 1,
 	    Storage: storage,
@@ -60,16 +55,28 @@ func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *Ra
 	    Logger: logger,
 	}
 
-	var raftNode etcdRaft.Node
 	if len(nodeIds) > 0 {
 		var peers []etcdRaft.Peer
 		for _, nodeId := range nodeIds {
 			peers = append(peers, etcdRaft.Peer{ID: nodeId})
 		}
-		raftNode = etcdRaft.StartNode(raftConfig, peers)
+		return etcdRaft.StartNode(raftConfig, peers), nil
 	} else {
 		// Allow the group to join existing cluster
-		raftNode = etcdRaft.RestartNode(raftConfig)
+		return etcdRaft.RestartNode(raftConfig), nil
+	}
+}
+
+func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
+	logger := log.WithFields(log.Fields{
+    	"node_id": fmt.Sprintf("%16x", transport.nodeId),
+    	"group_id": id.String(),
+    })
+
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	raftNode, err := startRaftNode(transport.NodeId(), nodeIds, storage, logger)
+	if err != nil {
+		return nil, err
 	}
 
 	g := &RaftGroup {
@@ -175,12 +182,13 @@ func (this *RaftGroup) run() {
 	snapshotTicker := time.NewTicker(10 * time.Second)
 	defer snapshotTicker.Stop()
 
-	var lastCommittedIdx uint64 = 0
+	var lastAppliedIdx uint64 = 0
 	for {
 		select {
 		case <- snapshotTicker.C:
-			if err := this.trySnapshot(lastCommittedIdx, 5); err != nil {
-				this.log.Warnf("Snapshot failed: %v", err)
+			if err := this.trySnapshot(lastAppliedIdx, snapshotOffset); err != nil {
+				this.log.Error("Snapshot failed: %v", err)
+				continue
 			}
 		case <- ticker.C:
 			this.raft.Tick()
@@ -191,10 +199,13 @@ func (this *RaftGroup) run() {
 			if err := this.wal.Save(rd.HardState, rd.Entries, rd.Snapshot); err != nil {
 				this.log.Fatal(err)
 			}
-			this.transport.Send(this.ctx, this, rd.Messages);
+			this.transport.Send(this.ctx, this, rd.Messages)
 			if !etcdRaft.IsEmptySnap(rd.Snapshot) {
 				if err := this.processSnapshotFn(rd.Snapshot.Data); err != nil {
 					this.log.Fatal(err)
+				}
+				if rd.Snapshot.Metadata.Index > lastAppliedIdx {
+					lastAppliedIdx = rd.Snapshot.Metadata.Index
 				}
 			}
 			for _, entry := range rd.CommittedEntries {
@@ -207,7 +218,7 @@ func (this *RaftGroup) run() {
 						}
 					}
 				}
-				lastCommittedIdx = entry.Index
+				lastAppliedIdx = entry.Index
 			}
 			this.raft.Advance()
 		case <- this.ctx.Done():
@@ -224,7 +235,7 @@ func (this *RaftGroup) isLeader() bool {
 func (this *RaftGroup) receive(messages []raftpb.Message) error {
 	for _, msg := range messages {
 		if err := this.raft.Step(this.ctx, msg); err != nil {
-			this.log.Error(err)
+			return err
 		}
 	}
 	return nil
@@ -286,6 +297,7 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx, skip uint64) error {
 		return err
 	}
 	if lastCommittedIdx <= existing.Metadata.Index + skip {
+		// Not enough new log entries to create snapshot
 		return nil
 	}
 
@@ -293,9 +305,7 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx, skip uint64) error {
 	if err != nil {
 		return err
 	}
-	if len(snapshotData) == 0 {
-		return EmptySnapshotDataErr
-	}
 
-	return this.wal.CreateSnapshot(lastCommittedIdx, this.raftConfState, snapshotData)
+	_, err = this.wal.CreateSnapshot(lastCommittedIdx, this.raftConfState, snapshotData)
+	return err
 }

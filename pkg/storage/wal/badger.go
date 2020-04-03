@@ -66,6 +66,7 @@ func NewBadgerWAL(db *badger.DB, groupId uuid.UUID) *badgerWAL {
 
 	_, err := wal.FirstIndex();
 	if err == entryNotFoundErr {
+		// Empty WAL. Populate with a dummy entry at term 0.
 		wal.reset(make([]raftpb.Entry, 1))
 	} else if err != nil {
 		log.Fatal(err)
@@ -212,65 +213,73 @@ func (this *badgerWAL) Save(hardState raftpb.HardState, entries []raftpb.Entry, 
 	if err := this.writeHardState(batch, hardState); err != nil {
 		return err
 	}
-	if err := this.writeSnapshot(batch, snapshot); err != nil {
-		return err
+	if !etcdRaft.IsEmptySnap(snapshot) {
+		if err := this.writeSnapshot(batch, snapshot); err != nil {
+			return err
+		}
+		// Delete the log
+		if err := this.deleteEntriesFromIndex(batch, 0); err != nil {
+			return err
+		}
 	}
 
 	return batch.Flush()
 }
 
-func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, data []byte) error {
+func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, data []byte) (raftpb.Snapshot, error) {
+	var snapshot raftpb.Snapshot
 	if confState == nil {
-		return EmptyConfStateErr
+		return snapshot, EmptyConfStateErr
 	}
 	firstIndex, err := this.FirstIndex()
 	if err != nil {
-		return err
+		return snapshot, err
 	}
 	if idx < firstIndex {
-		return etcdRaft.ErrSnapOutOfDate
+		return snapshot, etcdRaft.ErrSnapOutOfDate
 	}
 
 	var entry raftpb.Entry
 	if _, err := this.seekEntry(&entry, idx, false); err != nil {
-		return err
+		return snapshot, err
 	}
 	if idx != entry.Index {
-		return entryNotFoundErr
+		return snapshot, entryNotFoundErr
 	}
-
-	var snapshot raftpb.Snapshot
+	
 	snapshot.Metadata.Index = entry.Index
 	snapshot.Metadata.Term = entry.Term
-	snapshot.Metadata.ConfState = *confState
+	if confState != nil {
+		snapshot.Metadata.ConfState = *confState
+	}
 	snapshot.Data = data
 
 	batch := this.db.NewWriteBatch()
 	defer batch.Cancel()
 
 	if err := this.writeSnapshot(batch, snapshot); err != nil {
-		return err
+		return snapshot, err
 	}
 	if err := this.deleteEntriesUntilIndex(batch, snapshot.Metadata.Index); err != nil {
-		return err
+		return snapshot, err
 	}
 
-	return batch.Flush()
+	return snapshot, batch.Flush()
 }
 
 func (this *badgerWAL) DeleteGroup() error {
 	return this.reset(nil)	
 }
 
-func (this *badgerWAL) entryKey(idx uint64) []byte {
-	b := make([]byte, 24)
-	copy(b[0:16], this.groupId.Bytes())
-	binary.BigEndian.PutUint64(b[16:24], idx)
-	return b
-}
-
 func (this *badgerWAL) entryPrefix() []byte {
 	return this.groupId.Bytes()
+}
+
+func (this *badgerWAL) entryKey(idx uint64) []byte {
+	b := make([]byte, 24)
+	copy(b[0:16], this.entryPrefix())
+	binary.BigEndian.PutUint64(b[16:24], idx)
+	return b
 }
 
 func (this *badgerWAL) hardStateKey() []byte {
@@ -322,6 +331,21 @@ func (this *badgerWAL) seekEntry(entry *raftpb.Entry, seekTo uint64, reverse boo
 func (this *badgerWAL) getEntries(lo, hi, maxSize uint64) ([]raftpb.Entry, error) {
 	var entries []raftpb.Entry
 	err := this.db.View(func(txn *badger.Txn) error {
+		if hi - lo == 1 {
+			item, err := txn.Get(this.entryKey(lo))
+			if err != nil {
+				return err
+			}
+			return item.Value(func(val []byte) error {
+				var entry raftpb.Entry
+				if err := entry.Unmarshal(val); err != nil {
+					return err
+				}
+				entries = append(entries, entry)
+				return nil
+			})
+		}
+
 		iterOpt := badger.DefaultIteratorOptions
 		iterOpt.PrefetchValues = false
 		iterOpt.Prefix = this.entryPrefix()
@@ -451,7 +475,7 @@ func (this *badgerWAL) writeSnapshot(batch *badger.WriteBatch, snapshot raftpb.S
 }
 
 func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx uint64) error {
-	var keys [][]byte
+	var keys []string
 	err := this.db.View(func (txn *badger.Txn) error {
 		startKey := this.entryKey(fromIdx)
 
@@ -463,7 +487,7 @@ func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx 
 		defer iterator.Close()
 
 		for iterator.Seek(startKey); iterator.Valid(); iterator.Next() {
-			keys = append(keys, iterator.Item().Key())
+			keys = append(keys, string(iterator.Item().Key()))
 		}
 		return nil
 	})
@@ -474,11 +498,11 @@ func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx 
 	return this.deleteKeys(batch, keys)
 }
 
+// Deletes entries in the range [0, untilIdx)
 func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilIdx uint64) error {
-	var keys [][]byte
+	var keys []string
+	var index uint64
 	err := this.db.View(func (txn *badger.Txn) error {
-		startKey := this.entryKey(0)
-
 		iterOpt := badger.DefaultIteratorOptions
 		iterOpt.PrefetchValues = false
 		iterOpt.Prefix = this.entryPrefix()
@@ -486,21 +510,21 @@ func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilId
 		iterator := txn.NewIterator(iterOpt)
 		defer iterator.Close()
 
-		var index uint64
+		startKey := this.entryKey(0)
 		first := true
 		for iterator.Seek(startKey); iterator.Valid(); iterator.Next() {
 			item := iterator.Item()
 			index = this.parseIndex(item.Key())
 			if first {
+				first = false
 				if untilIdx <= index {
 					return etcdRaft.ErrCompacted
 				}
-				first = false
 			}
 			if index >= untilIdx {
 				break
 			}
-			keys = append(keys, item.Key())
+			keys = append(keys, string(item.Key()))
 		}
 		return nil
 	})
@@ -508,16 +532,25 @@ func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilId
 		return err
 	}
 
-	return this.deleteKeys(batch, keys)
+	if err := this.deleteKeys(batch, keys); err != nil {
+		return err
+	}
+
+	if v, ok := this.cache.Load(cacheFirstIndexKey); ok {
+		if v.(uint64) <= untilIdx {
+			this.cache.Store(cacheFirstIndexKey, untilIdx + 1)
+		}
+	}
+	return nil
 }
 
-func (this *badgerWAL) deleteKeys(batch *badger.WriteBatch, keys [][]byte) error {
+func (this *badgerWAL) deleteKeys(batch *badger.WriteBatch, keys []string) error {
 	if len(keys) == 0 {
 		return nil
 	}
 
 	for _, key := range keys {
-		if err := batch.Delete(key); err != nil {
+		if err := batch.Delete([]byte(key)); err != nil {
 			return err
 		}
 	}

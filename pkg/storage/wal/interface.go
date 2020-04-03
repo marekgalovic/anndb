@@ -8,6 +8,6 @@ import (
 type WAL interface {
 	etcdRaft.Storage
 	Save(raftpb.HardState, []raftpb.Entry, raftpb.Snapshot) error
-	CreateSnapshot(uint64, *raftpb.ConfState, []byte) error
+	CreateSnapshot(uint64, *raftpb.ConfState, []byte) (raftpb.Snapshot, error)
  	DeleteGroup() error
 }
