@@ -130,7 +130,6 @@ func (this *RaftTransport) Send(ctx context.Context, group *RaftGroup, messages 
 			}
 			continue
 		}
-
 		if containsSnapshot {
 			group.reportSnapshot(nodeId, etcdRaft.SnapshotFinish)
 		}

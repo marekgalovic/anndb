@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt";
 	"context";
 	"time";
 	"io";
@@ -44,7 +45,7 @@ type RaftGroup struct {
 
 func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
 	logger := log.WithFields(log.Fields{
-    	"node_id": transport.nodeId,
+    	"node_id": fmt.Sprintf("%16x", transport.nodeId),
     	"group_id": id.String(),
     })
 
@@ -178,12 +179,8 @@ func (this *RaftGroup) run() {
 	for {
 		select {
 		case <- snapshotTicker.C:
-			if !this.isLeader() {
-				continue
-			}
-			if err := this.trySnapshot(lastCommittedIdx, 0); err != nil {
+			if err := this.trySnapshot(lastCommittedIdx, 5); err != nil {
 				this.log.Warnf("Snapshot failed: %v", err)
-				continue
 			}
 		case <- ticker.C:
 			this.raft.Tick()
@@ -196,7 +193,6 @@ func (this *RaftGroup) run() {
 			}
 			this.transport.Send(this.ctx, this, rd.Messages);
 			if !etcdRaft.IsEmptySnap(rd.Snapshot) {
-				this.log.Infof("Process snapshot: %d\n", rd.Snapshot.Metadata.Index)
 				if err := this.processSnapshotFn(rd.Snapshot.Data); err != nil {
 					this.log.Fatal(err)
 				}
@@ -256,7 +252,6 @@ func (this *RaftGroup) reportUnreachable(nodeId uint64) {
 }
 
 func (this *RaftGroup) reportSnapshot(nodeId uint64, status etcdRaft.SnapshotStatus) {
-	this.log.Infof("Report snapshot: %d", nodeId)
 	this.raft.ReportSnapshot(nodeId, status)
 }
 
@@ -267,6 +262,8 @@ func (this *RaftGroup) processConfChange(entry raftpb.Entry) error {
 	}
 
 	if uuid.Equal(this.id, uuid.Nil) {
+		// Only the zero group should update transport
+		// This prevents partition node changes from adding/removing nodes
 		switch cc.Type {
 		case raftpb.ConfChangeAddNode:
 			this.transport.addNodeAddress(cc.NodeID, string(cc.Context))

@@ -240,7 +240,7 @@ func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, d
 	}
 
 	var snapshot raftpb.Snapshot
-	snapshot.Metadata.Index = idx
+	snapshot.Metadata.Index = entry.Index
 	snapshot.Metadata.Term = entry.Term
 	snapshot.Metadata.ConfState = *confState
 	snapshot.Data = data

@@ -45,6 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Infof("Raft node id: %16x", raftNodeId)
 
 	clusterConn, err := cluster.NewConn(tlsCertFile)
 	if err != nil {
