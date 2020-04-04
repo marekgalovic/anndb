@@ -77,7 +77,7 @@ func Max(values ...float32) float32 {
 }
 
 func MaxInt(values ...int) int {
-    max := MaxIntVal
+    max := -MaxIntVal
     for _, value := range values {
         if value > max {
             max = value

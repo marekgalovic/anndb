@@ -125,6 +125,10 @@ func (this *Conn) Dial(id uint64) (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
+func (this *Conn) DialAddress(address string) (*grpc.ClientConn, error) {
+	return grpc.Dial(address, this.grpcDialOptions()...)
+}
+
 func (this *Conn) getCachedConn(id uint64) *grpc.ClientConn {
 	this.connsMu.RLock()
 	defer this.connsMu.RUnlock()

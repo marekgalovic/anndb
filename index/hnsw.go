@@ -10,8 +10,6 @@ import (
     "github.com/marekgalovic/anndb/math";
     "github.com/marekgalovic/anndb/index/space";
     "github.com/marekgalovic/anndb/utils";
-
-    // log "github.com/sirupsen/logrus";
 )
 
 const VERTICES_MAP_SHARD_COUNT int = 16
@@ -110,6 +108,11 @@ func (this *Hnsw) Insert(id uint64, value math.Vector, vertexLevel int) error {
         }
     }
 
+    entrypoint = (*hnswVertex)(atomic.LoadPointer(&this.entrypoint));
+    if entrypoint != nil && vertex.level > entrypoint.level {
+        atomic.CompareAndSwapPointer(&this.entrypoint, this.entrypoint, unsafe.Pointer(vertex))
+    }
+
 	return nil;
 }
 
@@ -189,8 +192,9 @@ func (this *Hnsw) Search(ctx context.Context, query math.Vector, k uint) (Search
 
     ef := math.MaxInt(this.config.ef, int(k))
     neighbors := this.searchLevel(query, entrypoint, ef, 0)
-    n := math.MinInt(int(k), neighbors.Len())
+    neighbors = this.selectNeighbors(neighbors, int(k))
 
+    n := math.MinInt(int(k), neighbors.Len())
     result := make(SearchResult, n)
     for i := n-1; i >= 0; i-- {
         item := neighbors.Pop()

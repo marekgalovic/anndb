@@ -34,5 +34,5 @@ func (nativeSpaceImpl) CosineDistance(a, b math.Vector) float32 {
         bNorm += math.Square(b[i])
     }
 
-    return dot / (math.Sqrt(aNorm) * math.Sqrt(bNorm))
+    return 1.0 - dot / (math.Sqrt(aNorm) * math.Sqrt(bNorm))
 }

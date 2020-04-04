@@ -31,5 +31,5 @@ func CosineDistance(a, b []float32) float32 {
 	var norm_squared float32
 	_cosine_similarity_dot_norm(unsafe.Pointer(uintptr(len(a))), unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), unsafe.Pointer(&dot), unsafe.Pointer(&norm_squared))
 
-	return dot / float32(math.Sqrt(float64(norm_squared)))
+	return 1.0 - dot / float32(math.Sqrt(float64(norm_squared)))
 }
