@@ -55,12 +55,12 @@ func TestMax(t *testing.T) {
     assert.Equal(t, float32(-2), Max(-2, -4, -10, -15))   
 }
 
-func TestEquidistanPlane(t *testing.T) {
-    ehp := EquidistantPlane(
-        Vector{1, 2, 3},
-        Vector{0, 1, 2},
-    )
+func TestMinInt(t *testing.T) {
+    assert.Equal(t, 1, MinInt(5, 12, 1, 9))
+    assert.Equal(t, -12, MinInt(-5, -12, 1, 9))
+}
 
-    assert.Equal(t, Vector{-1, -1, -1}, ehp[:3])
-    assert.Equal(t, float32(-4.5), ehp[3])
+func TestMaxInt(t *testing.T) {
+    assert.Equal(t, 18, MaxInt(0, 12, 4, 18))
+    assert.Equal(t, -2, MaxInt(-2, -4, -10, -15))   
 }

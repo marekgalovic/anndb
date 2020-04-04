@@ -1,10 +1,28 @@
 package math
 
 import (
+    "bytes";
     "testing";
 
     "github.com/stretchr/testify/assert";
 )
+
+func TestVectorSaveAndLoad(t *testing.T) {
+    vec := make(Vector, 32)
+    for i := 0; i < 32; i++ {
+        vec[i] = float32(i * 2) + float32(i) / 2.0
+    }
+
+    var buf bytes.Buffer
+    err := vec.Save(&buf);
+    assert.Nil(t, err)
+
+    otherVec := make(Vector, 32)
+    err = otherVec.Load(&buf)
+    assert.Nil(t, err)
+
+    assert.Equal(t, vec, otherVec)
+}
 
 func TestZerosVector(t *testing.T) {
     vec := ZerosVector(16)
