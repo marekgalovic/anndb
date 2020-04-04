@@ -14,6 +14,7 @@ compile_sse:
 
 compile_protos:
 	protoc -I ./protobuf/proto --go_out=plugins=grpc:./protobuf ./protobuf/proto/*.proto
+	python -m grpc_tools.protoc -I ./protobuf/proto --python_out=./python --grpc_python_out=./python ./protobuf/proto/*.proto
 
 run_clean:
 	rm -rf ./data/${ID}
