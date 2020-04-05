@@ -205,7 +205,11 @@ func (this *partition) search(ctx context.Context, query []float32, k uint) (ind
 }
 
 func (this *partition) proposeAddNode(ctx context.Context, nodeId uint64) error {
-	return this.datasetManager.addPartitionNode(ctx, this.dataset.id, this.id, nodeId)
+	if err := this.datasetManager.addPartitionNode(ctx, this.dataset.id, this.id, nodeId); err != nil {
+		return err
+	}
+
+	return this.raft.ProposeJoin(nodeId, "")
 }
 
 func (this *partition) addNode(nodeId uint64) {
@@ -217,7 +221,11 @@ func (this *partition) addNode(nodeId uint64) {
 }
 
 func (this *partition) proposeRemoveNode(ctx context.Context, nodeId uint64) error {
-	return this.datasetManager.removePartitionNode(ctx, this.dataset.id, this.id, nodeId)
+	if err := this.datasetManager.removePartitionNode(ctx, this.dataset.id, this.id, nodeId); err != nil {
+		return err
+	}
+
+	return this.raft.ProposeLeave(nodeId)
 }
 
 func (this *partition) removeNode(nodeId uint64) {
