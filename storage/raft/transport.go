@@ -64,7 +64,7 @@ func (this *RaftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTr
 		return err
 	}
 
-	if err := group.proposeJoin(req.GetNodeId(), req.GetAddress()); err != nil {
+	if err := group.ProposeJoin(req.GetNodeId(), req.GetAddress()); err != nil {
 		return err
 	}
 

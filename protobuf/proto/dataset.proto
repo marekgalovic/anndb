@@ -46,14 +46,28 @@ message Partition {
 	repeated uint64 node_ids = 2;
 }
 
-enum DatasetsChangeType {
-	CreateDataset = 0;
-	DeleteDataset = 1;
+enum DatasetManagerChangeType {
+	DatasetManagerCreateDataset = 0;
+	DatasetManagerDeleteDataset = 1;
+	DatasetManagerUpdatePartitionNodes = 2;
 }
 
-message DatasetsChange {
-	DatasetsChangeType type = 1;
-	Dataset dataset = 2;
+message DatasetManagerChange {
+	DatasetManagerChangeType type = 1;
+	bytes notification_id = 2;
+	bytes data = 3;
+}
+
+enum DatasetPartitionNodesChangeType {
+	DatasetPartitionNodesChangeAddNode = 0;
+	DatasetPartitionNodesChangeRemoveNode = 1;
+}
+
+message DatasetPartitionNodesChange {
+	DatasetPartitionNodesChangeType type = 1;
+	bytes dataset_id = 2;
+	bytes partition_id = 3;
+	uint64 node_id = 4;
 }
 
 enum PartitionChangeType {
@@ -63,9 +77,10 @@ enum PartitionChangeType {
 
 message PartitionChange {
 	PartitionChangeType type = 1;
-	uint64 id = 2;
-	repeated float value = 3;
-	int32 level = 4;
+	bytes notification_id = 2;
+	uint64 id = 3;
+	repeated float value = 4;
+	int32 level = 5;
 }
 
 message DatasetManagerSnapshot {

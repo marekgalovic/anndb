@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os";
+	"bufio";
 	"flag";
 	"time";
 	"context";
@@ -31,20 +33,21 @@ func main() {
 	// dataManager := pb.NewDataManagerClient(conn)
 	// search := pb.NewSearchClient(conn)
 
-	// sentAt = time.Now()
-	// dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
-	// 	Dimension: 32,
-	// 	PartitionCount: 1,
-	// 	ReplicationFactor: 1,
-	// })
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// id := uuid.Must(uuid.FromBytes(dataset.GetId()))
-	// log.Info(id, time.Since(sentAt))
-	// time.Sleep(100 * time.Millisecond)
+	sentAt = time.Now()
+	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
+		Dimension: 32,
+		PartitionCount: 1,
+		ReplicationFactor: 3,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	id := uuid.Must(uuid.FromBytes(dataset.GetId()))
+	log.Info(id, time.Since(sentAt))
+	time.Sleep(100 * time.Millisecond)
 
-	id := uuid.Must(uuid.FromString("ca9adda5-bf87-4643-aacd-144b49afbe3d"))
+	log.Info("Press ENTER to delete the dataset.")
+	bufio.NewReader(os.Stdin).ReadBytes('\n') 
 
 	sentAt = time.Now()
 	_, err = datasetManager.Delete(context.Background(), &pb.UUIDRequest {

@@ -24,6 +24,7 @@ var (
 )
 
 type Dataset struct {
+	id uuid.UUID
 	meta *pb.Dataset
 	clusterConn *cluster.Conn
 
@@ -35,9 +36,10 @@ type Dataset struct {
 	searchClientsMu *sync.RWMutex
 }
 
-func newDataset(meta *pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn) (*Dataset, error) {
+func newDataset(id uuid.UUID, meta pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, datasetManager *DatasetManager) (*Dataset, error) {
 	d := &Dataset {
-		meta: meta,
+		id: id,
+		meta: &meta,
 		clusterConn: clusterConn,
 		partitions: make([]*partition, meta.GetPartitionCount()),
 		partitionsMap: make(map[uuid.UUID]*partition),
@@ -51,7 +53,7 @@ func newDataset(meta *pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.Raft
 		if err != nil {
 			return nil, err
 		}
-		partition := newPartition(pid, meta.Partitions[i].GetNodeIds(), d, raftWalDB, raftTransport)
+		partition := newPartition(pid, meta.Partitions[i], d, raftWalDB, raftTransport, datasetManager)
 		d.partitions[i] = partition
 		d.partitionsMap[pid] = partition
 	}
@@ -199,7 +201,7 @@ func (this *Dataset) getSearchQueryNodes() map[uint64][]uuid.UUID {
 
 	result := make(map[uint64][]uuid.UUID)
 	for _, partition := range this.partitions {
-		partitionNodeIds := partition.nodeIds
+		partitionNodeIds := partition.nodeIds()
 		nodeId := partitionNodeIds[rand.Intn(len(partitionNodeIds))]
 		if _, exists := result[nodeId]; !exists {
 			result[nodeId] = make([]uuid.UUID, 0)

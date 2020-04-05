@@ -10,7 +10,7 @@ import (
 	"github.com/marekgalovic/anndb/math";
 
 	"github.com/satori/go.uuid";
-	log "github.com/sirupsen/logrus";
+	// log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -113,9 +113,9 @@ func (this *allocator) run() {
 			}
 			switch change.Type {
 			case cluster.NodesChangeAddNode:
-				log.Infof("Allocator added node: %16x", change.NodeId)
+				this.addNodeToPartitions(change.NodeId)
 			case cluster.NodesChangeRemoveNode:
-				log.Infof("Allocator removed node: %16x", change.NodeId)
+				this.removeNodeFromPartitions(change.NodeId)
 			}
 		case update := <- this.updatesC:
 			if update == nil {
@@ -125,7 +125,7 @@ func (this *allocator) run() {
 			case *watchPartitionUpdate:
 				partition := update.(*watchPartitionUpdate).partition
 				if this.isPartitionAssignedToNode(partition) {
-					partition.loadRaft()
+					partition.loadRaft(partition.nodeIds())
 				}
 			case *unwatchPartitionUpdate:
 				partition := update.(*unwatchPartitionUpdate).partition
@@ -140,10 +140,41 @@ func (this *allocator) run() {
 }
 
 func (this *allocator) isPartitionAssignedToNode(partition *partition) bool {
-	for _, nodeId := range partition.nodeIds {
+	for _, nodeId := range partition.nodeIds() {
 		if this.clusterConn.Id() == nodeId {
 			return true
 		}
 	}
 	return false
+}
+
+func (this *allocator) canModifyPartition(partition *partition) bool {
+	if len(partition.nodeIds()) > 0 {
+		return partition.nodeIds()[0] == this.clusterConn.Id()
+	}
+
+	// Default leader for the whole cluster
+	return this.clusterConn.Id() == this.clusterConn.NodeIds()[0]
+}
+
+func (this *allocator) addNodeToPartitions(nodeId uint64) {
+	this.partitionsMu.RLock()
+	defer this.partitionsMu.RUnlock()
+
+	for _, partition := range this.partitions {
+		if this.canModifyPartition(partition) && partition.isUnderReplicated() {
+			partition.proposeAddNode(this.ctx, nodeId)
+		}
+	}
+}
+
+func (this *allocator) removeNodeFromPartitions(nodeId uint64) {
+	this.partitionsMu.RLock()
+	defer this.partitionsMu.RUnlock()
+
+	for _, partition := range this.partitions {
+		if this.canModifyPartition(partition) {
+			partition.proposeRemoveNode(this.ctx, nodeId)
+		}
+	}
 }

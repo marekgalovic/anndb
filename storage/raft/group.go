@@ -241,7 +241,7 @@ func (this *RaftGroup) receive(messages []raftpb.Message) error {
 	return nil
 }
 
-func (this *RaftGroup) proposeJoin(nodeId uint64, address string) error {
+func (this *RaftGroup) ProposeJoin(nodeId uint64, address string) error {
 	var cc raftpb.ConfChange
 	cc.Type = raftpb.ConfChangeAddNode
 	cc.NodeID = nodeId
@@ -250,7 +250,7 @@ func (this *RaftGroup) proposeJoin(nodeId uint64, address string) error {
 	return this.raft.ProposeConfChange(this.ctx, cc)
 }
 
-func (this *RaftGroup) proposeLeave(nodeId uint64) error {
+func (this *RaftGroup) ProposeLeave(nodeId uint64) error {
 	var cc raftpb.ConfChange
 	cc.Type = raftpb.ConfChangeRemoveNode
 	cc.NodeID = nodeId

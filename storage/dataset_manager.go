@@ -31,8 +31,7 @@ type DatasetManager struct {
 	datasets map[uuid.UUID]*Dataset
 	datasetsMu *sync.RWMutex
 
-	createdNotifications *utils.Notificator
-	deletedNotifications *utils.Notificator
+	notificator *utils.Notificator
 }
 
 func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *allocator) (*DatasetManager, error) {
@@ -46,8 +45,7 @@ func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTran
 		datasets: make(map[uuid.UUID]*Dataset),
 		datasetsMu: &sync.RWMutex{},
 
-		createdNotifications: utils.NewNotificator(),
-		deletedNotifications: utils.NewNotificator(),
+		notificator: utils.NewNotificator(),
 	}
 
 	if err := zeroGroup.RegisterProcessFn(dm.process); err != nil {
@@ -112,24 +110,30 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 		}
 	}
 
-	proposal := &pb.DatasetsChange {
-		Type: pb.DatasetsChangeType_CreateDataset,
-		Dataset: dataset,
+	datasetData, err := proto.Marshal(dataset)
+	if err != nil {
+		return nil, err
+	}
+
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
+
+	proposal := &pb.DatasetManagerChange {
+		Type: pb.DatasetManagerChangeType_DatasetManagerCreateDataset,
+		NotificationId: notifId.Bytes(),
+		Data: datasetData,
 	}
 	proposalData, err := proto.Marshal(proposal)
 	if err != nil {
 		return nil, err
 	}
 
-	notif := this.createdNotifications.Create(id)
-	defer func() { this.createdNotifications.Remove(id) }()
-
 	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
 		return nil, err
 	}
 
 	select {
-	case err := <- notif:
+	case err := <- notifC:
 		if err != nil {
 			return nil, err.(error)
 		}
@@ -143,24 +147,25 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
 	defer cancelCtx()
 
-	proposal := &pb.DatasetsChange {
-		Type: pb.DatasetsChangeType_DeleteDataset,
-		Dataset: &pb.Dataset {Id: id.Bytes()},
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
+
+	proposal := &pb.DatasetManagerChange {
+		Type: pb.DatasetManagerChangeType_DatasetManagerDeleteDataset,
+		NotificationId: notifId.Bytes(),
+		Data: id.Bytes(),
 	}
 	proposalData, err := proto.Marshal(proposal)
 	if err != nil {
 		return err
 	}
 
-	notif := this.deletedNotifications.Create(id)
-	defer func() { this.deletedNotifications.Remove(id) }()
-
 	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
 		return err
 	}
 
 	select {
-	case err := <- notif:
+	case err := <- notifC:
 		if err != nil {
 			return err.(error)
 		}
@@ -170,7 +175,11 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
-func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
+func (this *DatasetManager) createDataset(notificationId uuid.UUID, data []byte) error {
+	var dataset pb.Dataset
+	if err := proto.Unmarshal(data, &dataset); err != nil {
+		return err
+	}
 	id, err := uuid.FromBytes(dataset.GetId())
 	if err != nil {
 		return err
@@ -179,24 +188,24 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 	this.datasetsMu.Lock()
 	defer this.datasetsMu.Unlock()
 	if _, exists := this.datasets[id]; exists {
-		this.createdNotifications.Notify(id, DatasetAlreadyExistsErr)
+		this.notificator.Notify(notificationId, DatasetAlreadyExistsErr)
 		return nil
 	}
 
-	this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport, this.clusterConn)
+	this.datasets[id], err = newDataset(id, dataset, this.raftWalDB, this.raftTransport, this.clusterConn, this)
 	if err != nil {
-		this.createdNotifications.Notify(id, err)
+		this.notificator.Notify(notificationId, err)
 		return nil
 	}
 	for _, partition := range this.datasets[id].partitions {
 		this.allocator.watch(partition)
 	}
-	this.createdNotifications.Notify(id, nil)
+	this.notificator.Notify(notificationId, nil)
 	return nil
 }
 
-func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
-	id, err := uuid.FromBytes(datasetProto.GetId())
+func (this *DatasetManager) deleteDataset(notificationId uuid.UUID, data []byte) error {
+	id, err := uuid.FromBytes(data)
 	if err != nil {
 		return err
 	}
@@ -206,7 +215,7 @@ func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
 	dataset, exists := this.datasets[id]
 
 	if !exists {
-		this.deletedNotifications.Notify(id, DatasetNotFoundErr)
+		this.notificator.Notify(notificationId, DatasetNotFoundErr)
 		return nil
 	}
 
@@ -215,21 +224,28 @@ func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
 	}
 
 	delete(this.datasets, id)
-	this.deletedNotifications.Notify(id, nil)
+	this.notificator.Notify(notificationId, nil)
 	return nil
 }
 
 func (this *DatasetManager) process(data []byte) error {
-	var change pb.DatasetsChange
+	var change pb.DatasetManagerChange
 	if err := proto.Unmarshal(data, &change); err != nil {
 		return err
 	}
 
+	notificationId, err := uuid.FromBytes(change.GetNotificationId())
+	if err != nil {
+		return err
+	}
+
 	switch change.Type {
-	case pb.DatasetsChangeType_CreateDataset:
-		return this.createDataset(change.Dataset)
-	case pb.DatasetsChangeType_DeleteDataset:
-		return this.deleteDataset(change.Dataset)
+	case pb.DatasetManagerChangeType_DatasetManagerCreateDataset:
+		return this.createDataset(notificationId, change.Data)
+	case pb.DatasetManagerChangeType_DatasetManagerDeleteDataset:
+		return this.deleteDataset(notificationId, change.Data)
+	case pb.DatasetManagerChangeType_DatasetManagerUpdatePartitionNodes:
+		return this.updatePartitionNodes(notificationId, change.Data)
 	}
 	return nil
 }
@@ -249,7 +265,7 @@ func (this *DatasetManager) processSnapshot(data []byte) error {
 			return err
 		}
 		if _, exists := this.datasets[id]; !exists {
-			this.datasets[id], err = newDataset(dataset, this.raftWalDB, this.raftTransport, this.clusterConn)
+			this.datasets[id], err = newDataset(id, *dataset, this.raftWalDB, this.raftTransport, this.clusterConn, this)
 			if err != nil {
 				return err
 			}
@@ -270,4 +286,92 @@ func (this *DatasetManager) snapshot() ([]byte, error) {
 	}
 
 	return proto.Marshal(&pb.DatasetManagerSnapshot{Datasets: datasets})
+}
+
+func (this *DatasetManager) addPartitionNode(ctx context.Context, datasetId uuid.UUID, partitionId uuid.UUID, nodeId uint64) error {
+	return this.proposePartitionNodesChangeAndWaitForCommit(ctx, datasetId, partitionId, nodeId, pb.DatasetPartitionNodesChangeType_DatasetPartitionNodesChangeAddNode)
+}
+
+func (this *DatasetManager) removePartitionNode(ctx context.Context, datasetId uuid.UUID, partitionId uuid.UUID, nodeId uint64) error {
+	return this.proposePartitionNodesChangeAndWaitForCommit(ctx, datasetId, partitionId, nodeId, pb.DatasetPartitionNodesChangeType_DatasetPartitionNodesChangeRemoveNode)
+}
+
+func (this *DatasetManager) proposePartitionNodesChangeAndWaitForCommit(ctx context.Context, datasetId uuid.UUID, partitionId uuid.UUID, nodeId uint64, changeType pb.DatasetPartitionNodesChangeType) error {
+	change := &pb.DatasetPartitionNodesChange {
+		Type: changeType,
+		DatasetId: datasetId.Bytes(),
+		PartitionId: partitionId.Bytes(),
+		NodeId: nodeId,
+	}
+	changeData, err := proto.Marshal(change)
+	if err != nil {
+		return err
+	}
+
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
+
+	proposal := &pb.DatasetManagerChange {
+		Type: pb.DatasetManagerChangeType_DatasetManagerUpdatePartitionNodes,
+		NotificationId: notifId.Bytes(),
+		Data: changeData,
+	}
+	proposalData, err := proto.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
+		return err
+	}
+
+	select {
+	case err := <- notifC:
+		if err != nil {
+			return err.(error)
+		}
+		return nil
+	case <- ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (this *DatasetManager) updatePartitionNodes(notificationId uuid.UUID, data []byte) error {
+	var change pb.DatasetPartitionNodesChange
+	if err := proto.Unmarshal(data, &change); err != nil {
+		return err
+	}
+
+	datasetId, err := uuid.FromBytes(change.GetDatasetId())
+	if err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+
+	partitionId, err := uuid.FromBytes(change.GetPartitionId())
+	if err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+
+	dataset, err := this.Get(datasetId)
+	if err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+
+	partition, err := dataset.getPartition(partitionId)
+	if err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+
+	switch change.Type {
+	case pb.DatasetPartitionNodesChangeType_DatasetPartitionNodesChangeAddNode:
+		partition.addNode(change.GetNodeId())
+	case pb.DatasetPartitionNodesChangeType_DatasetPartitionNodesChangeRemoveNode:
+		partition.removeNode(change.GetNodeId())
+	}
+
+	this.notificator.Notify(notificationId, nil)
+	return nil
 }
