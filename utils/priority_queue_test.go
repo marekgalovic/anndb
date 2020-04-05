@@ -86,8 +86,15 @@ func TestPriorityQueueValues(t *testing.T) {
     assert.Equal(t, 3, len(values))
     assert.Equal(t, 3, q.Len())
 
-    valuesSet := NewSet(values...)
-    assert.True(t, valuesSet.Contains("foo"))
-    assert.True(t, valuesSet.Contains("bar"))
-    assert.True(t, valuesSet.Contains("bag"))
+    valuesSet := make(map[interface{}]struct{})
+    for _, v := range values {
+        valuesSet[v] = struct{}{}
+    }
+    
+    _, contains := valuesSet["foo"]
+    assert.True(t, contains)
+    _, contains = valuesSet["bar"]
+    assert.True(t, contains)
+    _, contains = valuesSet["bag"]
+    assert.True(t, contains)
 }

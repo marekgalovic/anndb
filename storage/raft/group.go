@@ -187,7 +187,7 @@ func (this *RaftGroup) run() {
 		select {
 		case <- snapshotTicker.C:
 			if err := this.trySnapshot(lastAppliedIdx, snapshotOffset); err != nil {
-				this.log.Error("Snapshot failed: %v", err)
+				this.log.Errorf("Snapshot failed: %v", err)
 				continue
 			}
 		case <- ticker.C:
