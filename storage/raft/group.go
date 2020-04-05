@@ -4,15 +4,12 @@ import (
 	"fmt";
 	"context";
 	"time";
-	"io";
 	"errors"
 	"sync/atomic";
 
-	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/storage/wal";
 
 	"github.com/satori/go.uuid";
-	"google.golang.org/grpc";
 	etcdRaft "github.com/coreos/etcd/raft";
 	"github.com/coreos/etcd/raft/raftpb";
 	log "github.com/sirupsen/logrus";
@@ -138,41 +135,21 @@ func (this *RaftGroup) Propose(ctx context.Context, data []byte) error {
 	return this.raft.Propose(ctx, data)
 }
 
-func (this *RaftGroup) Join(nodes []string) error {
-	var conn *grpc.ClientConn
-	var err error
-	for i, addr := range nodes {
-		conn, err = grpc.Dial(addr, grpc.WithInsecure())
-		if err != nil {
-			if i == len(nodes)-1 {
-				return err
-			}
-			continue
-		}
-		break
-	}
-	defer conn.Close()
+func (this *RaftGroup) ProposeJoin(nodeId uint64, address string) error {
+	var cc raftpb.ConfChange
+	cc.Type = raftpb.ConfChangeAddNode
+	cc.NodeID = nodeId
+	cc.Context = []byte(address)
 
-	nodesStream, err := pb.NewRaftTransportClient(conn).ProposeJoin(this.ctx, &pb.RaftJoinMessage {
-		NodeId: this.transport.NodeId(),
-		GroupId: this.id.Bytes(),
-		Address: this.transport.Address(),
-	})
-	if err != nil {
-		return err
-	}
+	return this.raft.ProposeConfChange(this.ctx, cc)
+}
 
-	for {
-		node, err := nodesStream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		this.transport.addNodeAddress(node.GetId(), node.GetAddress())
-	}
-	return nil
+func (this *RaftGroup) ProposeLeave(nodeId uint64) error {
+	var cc raftpb.ConfChange
+	cc.Type = raftpb.ConfChangeRemoveNode
+	cc.NodeID = nodeId
+
+	return this.raft.ProposeConfChange(this.ctx, cc)
 }
 
 func (this *RaftGroup) run() {
@@ -239,23 +216,6 @@ func (this *RaftGroup) receive(messages []raftpb.Message) error {
 		}
 	}
 	return nil
-}
-
-func (this *RaftGroup) ProposeJoin(nodeId uint64, address string) error {
-	var cc raftpb.ConfChange
-	cc.Type = raftpb.ConfChangeAddNode
-	cc.NodeID = nodeId
-	cc.Context = []byte(address)
-
-	return this.raft.ProposeConfChange(this.ctx, cc)
-}
-
-func (this *RaftGroup) ProposeLeave(nodeId uint64) error {
-	var cc raftpb.ConfChange
-	cc.Type = raftpb.ConfChangeRemoveNode
-	cc.NodeID = nodeId
-
-	return this.raft.ProposeConfChange(this.ctx, cc)
 }
 
 func (this *RaftGroup) reportUnreachable(nodeId uint64) {

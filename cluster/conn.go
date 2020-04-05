@@ -27,6 +27,7 @@ type nodesChange struct {
 
 type Conn struct {
 	id uint64
+	address string
 	addresses map[uint64]string
 	addressesMu sync.RWMutex
 	conns map[uint64]*grpc.ClientConn
@@ -37,9 +38,10 @@ type Conn struct {
 	transportCredentials credentials.TransportCredentials
 }
 
-func NewConn(id uint64, tlsCertFile string) (*Conn, error) {
+func NewConn(id uint64, address string, tlsCertFile string) (*Conn, error) {
 	c := &Conn {
 		id: id,
+		address: address,
 		addresses: make(map[uint64]string),
 		addressesMu: sync.RWMutex{},
 		conns: make(map[uint64]*grpc.ClientConn),
@@ -61,6 +63,10 @@ func NewConn(id uint64, tlsCertFile string) (*Conn, error) {
 
 func (this *Conn) Id() uint64 {
 	return this.id
+}
+
+func (this *Conn) Address() string {
+	return this.address
 }
 
 func (this *Conn) Close() {

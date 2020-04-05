@@ -53,33 +53,6 @@ func (this *RaftTransport) NodeId() uint64 {
 func (this *RaftTransport) Address() string {
 	return this.address
 }
-
-func (this *RaftTransport) ProposeJoin(req *pb.RaftJoinMessage, stream pb.RaftTransport_ProposeJoinServer) error {
-	groupId, err := uuid.FromBytes(req.GetGroupId())
-	if err != nil {
-		return err
-	}
-	group, err := this.getGroup(groupId)
-	if err != nil {
-		return err
-	}
-
-	if err := group.ProposeJoin(req.GetNodeId(), req.GetAddress()); err != nil {
-		return err
-	}
-
-	if err := stream.Send(&pb.RaftNode{Id: this.NodeId(), Address: this.Address()}); err != nil {
-		return err
-	}
-
-	for nodeId, address := range this.clusterConn.Nodes() {
-		if err := stream.Send(&pb.RaftNode{Id: nodeId, Address: address}); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
  
 func (this *RaftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*pb.EmptyMessage, error) {
 	groupId, err := uuid.FromBytes(req.GetGroupId())

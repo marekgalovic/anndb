@@ -6,6 +6,7 @@ import (
 	"net";
 	"path";
 	"time";
+	"context";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/cluster";
@@ -47,7 +48,7 @@ func main() {
 	}
 	log.Infof("Raft node id: %16x", raftNodeId)
 
-	clusterConn, err := cluster.NewConn(raftNodeId, tlsCertFile)
+	clusterConn, err := cluster.NewConn(raftNodeId, net.JoinHostPort("", port), tlsCertFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,6 +65,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer zeroGroup.Stop()
+
+	nodesManager := raft.NewNodesManager(clusterConn, zeroGroup)
 
 	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport, clusterConn, allocator)
 	if err != nil {
@@ -88,6 +91,7 @@ func main() {
 
 	grpcServer := grpc.NewServer(grpcServerOptions...)
 	pb.RegisterRaftTransportServer(grpcServer, raftTransport)
+	pb.RegisterNodesManagerServer(grpcServer, services.NewNodesManagerServer(nodesManager))
 	pb.RegisterDatasetManagerServer(grpcServer, services.NewDatasetManagerServer(datasetManager))
 	pb.RegisterDataManagerServer(grpcServer, services.NewDataManagerServer(datasetManager))
 	pb.RegisterSearchServer(grpcServer, services.NewSearchServer(datasetManager))
@@ -95,7 +99,7 @@ func main() {
 
 	// Join cluster
 	if len(joinNodesRaw) > 0 {
-		if err := zeroGroup.Join(strings.Split(joinNodesRaw, ",")); err != nil {
+		if err := nodesManager.Join(context.Background(), strings.Split(joinNodesRaw, ",")); err != nil {
 			log.Fatal(err)
 		}
 	}
