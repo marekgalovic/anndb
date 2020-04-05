@@ -7,6 +7,7 @@ import (
 	"path";
 	"time";
 	"context";
+	"errors";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/cluster";
@@ -24,11 +25,13 @@ import (
 )
 
 func main() {
+	var raftNodeId uint64
 	var port string
 	var joinNodesRaw string
 	var dataDir string
 	var tlsCertFile string
 	var tlsKeyFile string
+	flag.Uint64Var(&raftNodeId, "node-id", 0, "Raft node ID")
 	flag.StringVar(&port, "port", utils.GetenvDefault("ANNDB_PORT", "6000"), "Node port")
 	flag.StringVar(&joinNodesRaw, "join", utils.GetenvDefault("ANNDB_JOIN", ""), "Comma separated list of existing cluster nodes")
 	flag.StringVar(&dataDir, "data-dir", utils.GetenvDefault("ANNDB_DATA_DIR", "/tmp"), "Data directory")
@@ -42,7 +45,7 @@ func main() {
 	}
 	defer db.Close()
 
-	raftNodeId, err := getRaftNodeId(db)
+	raftNodeId, err = getRaftNodeId(db, raftNodeId)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,15 +114,22 @@ func main() {
 	log.Info("Shutdown")
 }
 
-func getRaftNodeId(db *badger.DB) (uint64, error) {
+func getRaftNodeId(db *badger.DB, existingId uint64) (uint64, error) {
 	nodeId, err := wal.GetBadgerRaftId(db)
 	if err != nil && err != badger.ErrKeyNotFound {
 		return 0, err
 	} else if err == nil {
+		if existingId > 0 && existingId != nodeId {
+			return 0, errors.New("Starting node with custom id which does not match the one stored in WAL")
+		}
 		return nodeId, nil
 	}
 
-	nodeId = uint64(time.Now().UTC().UnixNano())
+	if existingId > 0 {
+		nodeId = existingId
+	} else {
+		nodeId = uint64(time.Now().UTC().UnixNano())
+	}
 	if err := wal.SetBadgerRaftId(db, nodeId); err != nil {
 		return 0, err
 	}
