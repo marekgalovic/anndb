@@ -5,12 +5,10 @@ import (
 	"context";
 	"sync";
 	"time";
-	"math/rand"
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/cluster";
 	"github.com/marekgalovic/anndb/storage/raft";
-	"github.com/marekgalovic/anndb/math";
 	"github.com/marekgalovic/anndb/utils";
 
 	"github.com/satori/go.uuid";
@@ -28,6 +26,7 @@ type DatasetManager struct {
 	raftWalDB *badger.DB
 	raftTransport *raft.RaftTransport
 	clusterConn *cluster.Conn
+	allocator *allocator
 
 	datasets map[uuid.UUID]*Dataset
 	datasetsMu *sync.RWMutex
@@ -36,12 +35,13 @@ type DatasetManager struct {
 	deletedNotifications *utils.Notificator
 }
 
-func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn) (*DatasetManager, error) {
+func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *allocator) (*DatasetManager, error) {
 	dm := &DatasetManager {
 		zeroGroup: zeroGroup,
 		raftWalDB: raftWalDB,
 		raftTransport: raftTransport,
 		clusterConn: clusterConn,
+		allocator: allocator,
 
 		datasets: make(map[uuid.UUID]*Dataset),
 		datasetsMu: &sync.RWMutex{},
@@ -104,7 +104,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 	id := uuid.NewV4()
 	dataset.Id = id.Bytes()
 	dataset.Partitions = make([]*pb.Partition, dataset.GetPartitionCount())
-	partitionsNodeIds := this.getPartitionsNodeIds(this.clusterConn.NodeIds(), uint(dataset.GetPartitionCount()), uint(dataset.GetReplicationFactor()))
+	partitionsNodeIds := this.allocator.getPartitionsNodeIds(uint(dataset.GetPartitionCount()), uint(dataset.GetReplicationFactor()))
 	for i := 0; i < int(dataset.GetPartitionCount()); i++ {
 		dataset.Partitions[i] = &pb.Partition {
 			Id: uuid.NewV4().Bytes(),
@@ -188,6 +188,9 @@ func (this *DatasetManager) createDataset(dataset *pb.Dataset) error {
 		this.createdNotifications.Notify(id, err)
 		return nil
 	}
+	for _, partition := range this.datasets[id].partitions {
+		this.allocator.watch(partition)
+	}
 	this.createdNotifications.Notify(id, nil)
 	return nil
 }
@@ -207,27 +210,13 @@ func (this *DatasetManager) deleteDataset(datasetProto *pb.Dataset) error {
 		return nil
 	}
 
-	if err := dataset.deleteData(); err != nil {
-		this.deletedNotifications.Notify(id, err)
-		return nil
+	for _, partition := range dataset.partitions {
+		this.allocator.unwatch(partition.id)
 	}
 
 	delete(this.datasets, id)
 	this.deletedNotifications.Notify(id, nil)
 	return nil
-}
-
-func (this *DatasetManager) getPartitionsNodeIds(nodeIds []uint64, partitionCount uint, replicationFactor uint) [][]uint64 {
-	partitionsNodeIds := make([][]uint64, partitionCount)
-	for i := 0; i < int(partitionCount); i++ {
-		rand.Shuffle(len(nodeIds), func(i, j int) {
-			nodeIds[i], nodeIds[j] = nodeIds[j], nodeIds[i]
-		})
-		
-		partitionsNodeIds[i] = nodeIds[:math.MinInt(len(nodeIds), int(replicationFactor))]
-	}
-
-	return partitionsNodeIds
 }
 
 func (this *DatasetManager) process(data []byte) error {

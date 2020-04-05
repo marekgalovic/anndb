@@ -4,6 +4,8 @@ import (
 	"context";
 	"time";
 	"bytes";
+	"errors";
+	"sync";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/math";
@@ -19,17 +21,25 @@ import (
 	log "github.com/sirupsen/logrus";
 )
 
+var (
+	RaftNotLoadedOnNodeErr error = errors.New("Raft is not loaded on this node")
+)
+
 type partition struct {
 	id uuid.UUID
-	servingNodeIds []uint64
+	nodeIds []uint64
 	dataset *Dataset
 	index *index.Hnsw
 
 	raft *raft.RaftGroup
 	wal wal.WAL
+	raftTransport *raft.RaftTransport
+	raftMu *sync.RWMutex
 
 	insertNotifications *utils.Notificator
 	deleteNotifications *utils.Notificator
+
+	log *log.Entry
 }
 
 func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
@@ -47,50 +57,78 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 }
 
 func newPartition(id uuid.UUID, nodeIds []uint64, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport) *partition {
-	wal := wal.NewBadgerWAL(raftWalDB, id)
-	raft, err := raft.NewRaftGroup(id, nodeIds, wal, raftTransport)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	p := &partition {
 		id: id,
-		servingNodeIds: nodeIds,
+		nodeIds: nodeIds,
 		dataset: dataset,
 		index: newIndexFromDatasetProto(dataset.Meta()),
-		raft: raft,
-		wal: wal,
+		raft: nil,
+		wal: wal.NewBadgerWAL(raftWalDB, id),
+		raftTransport: raftTransport,
+		raftMu: &sync.RWMutex{},
 		insertNotifications: utils.NewNotificator(),
 		deleteNotifications: utils.NewNotificator(),
-	}
-
-	if err := raft.RegisterProcessFn(p.process); err != nil {
-		log.Fatal(err)
-	}
-	if err := raft.RegisterProcessSnapshotFn(p.processSnapshot); err != nil {
-		log.Fatal(err)
-	}
-	if err := raft.RegisterSnapshotFn(p.snapshot); err != nil {
-		log.Fatal(err)
+		log: log.WithFields(log.Fields {
+			"partition_id": id,
+		}),
 	}
 
 	return p
 }
 
+func (this *partition) loadRaft() error {
+	this.raftMu.Lock()
+	defer this.raftMu.Unlock()
+
+	var err error
+	this.raft, err = raft.NewRaftGroup(this.id, this.nodeIds, this.wal, this.raftTransport)
+	if err != nil {
+		return err
+	}
+	if err := this.raft.RegisterProcessFn(this.process); err != nil {
+		return err
+	}
+	if err := this.raft.RegisterProcessSnapshotFn(this.processSnapshot); err != nil {
+		return err
+	}
+	if err := this.raft.RegisterSnapshotFn(this.snapshot); err != nil {
+		return err
+	}
+
+	this.log.Info("Loaded Raft")
+	return nil
+}
+
+func (this *partition) unloadRaft() error {
+	this.raftMu.Lock()
+	defer this.raftMu.Unlock()
+	if this.raft == nil {
+		return RaftNotLoadedOnNodeErr
+	}
+
+	this.raft.Stop()
+	this.wal.DeleteGroup()
+	this.raft = nil
+	this.log.Info("Unloaded Raft")
+	return nil
+}
+
 func (this *partition) close() {
-	this.raft.Stop()
-}
+	this.raftMu.RLock()
+	defer this.raftMu.RUnlock()
 
-func (this *partition) deleteData() error {
-	this.raft.Stop()
-	return this.wal.DeleteGroup()
-}
-
-func (this *partition) nodeIds() []uint64 {
-	return this.servingNodeIds
+	if this.raft != nil {
+		this.raft.Stop()
+	}
 }
 
 func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
+	this.raftMu.RLock()
+	defer this.raftMu.RUnlock()
+	if this.raft == nil {
+		return RaftNotLoadedOnNodeErr
+	}
+
 	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
 	defer cancelCtx()
 

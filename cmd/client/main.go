@@ -31,20 +31,32 @@ func main() {
 	// dataManager := pb.NewDataManagerClient(conn)
 	// search := pb.NewSearchClient(conn)
 
-	for i := 0; i < 1; i++ {
-		sentAt = time.Now()
-		dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
-			Dimension: 32,
-			PartitionCount: 1,
-			ReplicationFactor: 3,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		id := uuid.Must(uuid.FromBytes(dataset.GetId()))
-		log.Info(id, time.Since(sentAt))
-		time.Sleep(100 * time.Millisecond)
+	// sentAt = time.Now()
+	// dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
+	// 	Dimension: 32,
+	// 	PartitionCount: 1,
+	// 	ReplicationFactor: 1,
+	// })
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// id := uuid.Must(uuid.FromBytes(dataset.GetId()))
+	// log.Info(id, time.Since(sentAt))
+	// time.Sleep(100 * time.Millisecond)
+
+	id := uuid.Must(uuid.FromString("ca9adda5-bf87-4643-aacd-144b49afbe3d"))
+
+	sentAt = time.Now()
+	_, err = datasetManager.Delete(context.Background(), &pb.UUIDRequest {
+		Id: id.Bytes(),
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
+	log.Info(id, time.Since(sentAt))
+	time.Sleep(100 * time.Millisecond)
+
+	
 	// time.Sleep(1 * time.Second)
 
 	// // id := uuid.Must(uuid.FromString("144cda2f-4c66-464c-8f25-dbbfdeba2f7b"))

@@ -47,11 +47,14 @@ func main() {
 	}
 	log.Infof("Raft node id: %16x", raftNodeId)
 
-	clusterConn, err := cluster.NewConn(tlsCertFile)
+	clusterConn, err := cluster.NewConn(raftNodeId, tlsCertFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer clusterConn.Close()
+
+	allocator := storage.NewAllocator(clusterConn)
+	defer allocator.Stop()
 
 	raftTransport := raft.NewTransport(raftNodeId, net.JoinHostPort("", port), clusterConn)
 
@@ -62,7 +65,7 @@ func main() {
 	}
 	defer zeroGroup.Stop()
 
-	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport, clusterConn)
+	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport, clusterConn, allocator)
 	if err != nil {
 		log.Fatal(err)
 	}

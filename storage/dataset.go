@@ -16,7 +16,6 @@ import (
 	
 	"github.com/satori/go.uuid";
 	badger "github.com/dgraph-io/badger/v2";
-	log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -170,19 +169,6 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 	return result[:math.MinInt(int(k), len(result))], nil
 }
 
-func (this *Dataset) deleteData() error {
-	this.partitionsMu.Lock()
-	defer this.partitionsMu.Unlock()
-
-	for _, partition := range this.partitions {
-		if err := partition.deleteData(); err != nil {
-			log.Error(err)
-		}
-	}
-
-	return nil
-}
-
 func (this *Dataset) getPartition(id uuid.UUID) (*partition, error) {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
@@ -213,7 +199,7 @@ func (this *Dataset) getSearchQueryNodes() map[uint64][]uuid.UUID {
 
 	result := make(map[uint64][]uuid.UUID)
 	for _, partition := range this.partitions {
-		partitionNodeIds := partition.nodeIds()
+		partitionNodeIds := partition.nodeIds
 		nodeId := partitionNodeIds[rand.Intn(len(partitionNodeIds))]
 		if _, exists := result[nodeId]; !exists {
 			result[nodeId] = make([]uuid.UUID, 0)

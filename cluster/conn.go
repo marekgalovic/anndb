@@ -13,21 +13,39 @@ var (
 	NodeAddressNotFoundError error = errors.New("Node address not found")
 )
 
+type nodesChangeType uint
+
+const (
+	NodesChangeAddNode nodesChangeType = iota
+	NodesChangeRemoveNode
+)
+
+type nodesChange struct {
+	Type nodesChangeType
+	NodeId uint64
+}
+
 type Conn struct {
+	id uint64
 	addresses map[uint64]string
 	addressesMu sync.RWMutex
 	conns map[uint64]*grpc.ClientConn
 	connsMu sync.RWMutex
+	notifications []chan *nodesChange
+	notificationsMu *sync.RWMutex
 
 	transportCredentials credentials.TransportCredentials
 }
 
-func NewConn(tlsCertFile string) (*Conn, error) {
+func NewConn(id uint64, tlsCertFile string) (*Conn, error) {
 	c := &Conn {
+		id: id,
 		addresses: make(map[uint64]string),
 		addressesMu: sync.RWMutex{},
 		conns: make(map[uint64]*grpc.ClientConn),
 		connsMu: sync.RWMutex{},
+		notifications: make([]chan *nodesChange, 0),
+		notificationsMu: &sync.RWMutex{},
 	}
 
 	if tlsCertFile != "" {
@@ -41,6 +59,10 @@ func NewConn(tlsCertFile string) (*Conn, error) {
 	return c, nil
 }
 
+func (this *Conn) Id() uint64 {
+	return this.id
+}
+
 func (this *Conn) Close() {
 	this.connsMu.Lock()
 	defer this.connsMu.Unlock()
@@ -50,6 +72,21 @@ func (this *Conn) Close() {
 			log.Error(err)
 		}
 	}
+
+	this.notificationsMu.Lock()
+	defer this.notificationsMu.Unlock()
+	for _, c := range this.notifications {
+		close(c)
+	}
+}
+
+func (this *Conn) NodeChangesNotifications() <- chan *nodesChange {
+	this.notificationsMu.Lock()
+	defer this.notificationsMu.Unlock()
+
+	c := make(chan *nodesChange, 10)
+	this.notifications = append(this.notifications, c)
+	return c
 }
 
 func (this *Conn) Nodes() map[uint64]string {
@@ -82,6 +119,11 @@ func (this *Conn) AddNode(id uint64, address string) {
 	if _, exists := this.addresses[id]; !exists {
 		this.addresses[id] = address
 	}
+
+	this.sendNodesChangeNotification(&nodesChange {
+		Type: NodesChangeAddNode,
+		NodeId: id,
+	})
 }
 
 func (this *Conn) RemoveNode(id uint64) {
@@ -97,6 +139,11 @@ func (this *Conn) RemoveNode(id uint64) {
 		}
 		delete(this.conns, id)
 	}
+
+	this.sendNodesChangeNotification(&nodesChange {
+		Type: NodesChangeRemoveNode,
+		NodeId: id,
+	})
 }
 
 func (this *Conn) Dial(id uint64) (*grpc.ClientConn, error) {
@@ -159,4 +206,13 @@ func (this *Conn) grpcDialOptions() []grpc.DialOption {
 	}
 	
 	return options
+}
+
+func (this *Conn) sendNodesChangeNotification(n *nodesChange) {
+	this.notificationsMu.RLock()
+	defer this.notificationsMu.RUnlock()
+
+	for _, c := range this.notifications {
+		c <- n
+	}
 }
