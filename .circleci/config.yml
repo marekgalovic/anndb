@@ -11,7 +11,7 @@ jobs:
           keys:
             - v1-pkg-cache
 
-      - run: go test -v ./...
+      - run: CGO_ENABLED=0 go test -v ./...
 
       - save_cache:
           key: v1-pkg-cache
