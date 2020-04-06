@@ -5,8 +5,12 @@ RUN mkdir -p /anndb
 COPY . /anndb
 WORKDIR /anndb
 
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
 # Build
-RUN CGO_ENABLED=0 go mod download
-RUN CGO_ENABLED=0 go build -o /go/bin/anndb cmd/anndb/main.go
+RUN go mod download
+RUN go build -o /go/bin/anndb cmd/anndb/main.go
 
 ENTRYPOINT ["/go/bin/anndb"]

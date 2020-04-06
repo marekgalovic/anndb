@@ -4,6 +4,7 @@ package anndb_pb;
 import "core.proto";
 
 service NodesManager {
+	rpc ListNodes(EmptyMessage) returns (stream Node);
 	rpc AddNode(Node) returns (stream Node);
 	rpc RemoveNode(Node) returns (EmptyMessage);
 }

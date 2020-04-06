@@ -38,6 +38,10 @@ func (this *NodesManager) Join(ctx context.Context, addresses []string) error {
 	return nil
 }
 
+func (this *NodesManager) ListNodes() map[uint64]string {
+	return this.clusterConn.Nodes()
+}
+
 func (this *NodesManager) AddNode(id uint64, address string) (map[uint64]string, error) {
 	if err := this.zeroGroup.ProposeJoin(id, address); err != nil {
 		return nil, err
