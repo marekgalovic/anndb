@@ -71,13 +71,13 @@ func hnswIsSame(a, b *Hnsw) error {
 }
 
 func generateRandomIndex(dim, size int, space space.Space) *Hnsw {
-    index := NewHnsw(uint(dim), space)
+    index := NewHnsw(uint(dim), space, nil)
     delOffset := int(size / 10)
     for i := 0; i < size; i++ {
         if i > delOffset && (math.RandomUniform() <= 0.2) {
             index.Remove(uint64(rand.Intn(i-delOffset)))
         } else {
-            index.Insert(uint64(i), math.RandomUniformVector(dim), index.RandomLevel())
+            index.Insert(uint64(i), math.RandomUniformVector(dim), nil, index.RandomLevel())
         }
     }
     return index
@@ -93,7 +93,7 @@ func TestHnswSaveAndLoad(t *testing.T) {
         return
     }
 
-    otherIndex := NewHnsw(128, space.NewEuclidean())
+    otherIndex := NewHnsw(128, space.NewEuclidean(), nil)
     err = otherIndex.Load(&buf, true)
     assert.Nil(t, err)
     if err != nil {

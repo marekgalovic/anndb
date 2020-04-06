@@ -24,6 +24,7 @@ type Hnsw struct {
     size uint
     space space.Space
 	config *hnswConfig
+    metadataSchema MetadataSchema
 
     len uint64
     vertices [VERTICES_MAP_SHARD_COUNT]map[uint64]*hnswVertex
@@ -32,11 +33,12 @@ type Hnsw struct {
     entrypoint unsafe.Pointer
 }
 
-func NewHnsw(size uint, space space.Space, options ...HnswOption) *Hnsw {
+func NewHnsw(size uint, space space.Space, metadataSchema MetadataSchema, options ...HnswOption) *Hnsw {
 	index := &Hnsw {
         size: size,
         space: space,
 		config: newHnswConfig(options),
+        metadataSchema: metadataSchema,
 
         len: 0,
         entrypoint: nil,
@@ -54,10 +56,10 @@ func (this *Hnsw) Len() int {
 	return int(atomic.LoadUint64(&this.len));
 }
 
-func (this *Hnsw) Insert(id uint64, value math.Vector, vertexLevel int) error {
+func (this *Hnsw) Insert(id uint64, value math.Vector, metadata Metadata, vertexLevel int) error {
     var vertex *hnswVertex
     if (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)) == nil {
-        vertex = newHnswVertex(id, value, 0)
+        vertex = newHnswVertex(id, value, metadata, 0)
         if err := this.storeVertex(vertex); err != nil {
             return err
         }
@@ -67,7 +69,7 @@ func (this *Hnsw) Insert(id uint64, value math.Vector, vertexLevel int) error {
             vertex.setLevel(vertexLevel)
         }
     } else {
-        vertex = newHnswVertex(id, value, vertexLevel)
+        vertex = newHnswVertex(id, value, metadata, vertexLevel)
         if err := this.storeVertex(vertex); err != nil {
             return err
         }

@@ -54,7 +54,7 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 		s = space.NewCosine()
 	}
 
-	return index.NewHnsw(uint(dataset.GetDimension()), s) 
+	return index.NewHnsw(uint(dataset.GetDimension()), s, nil) 
 }
 
 func newPartition(id uuid.UUID, meta *pb.Partition, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, datasetManager *DatasetManager) *partition {
@@ -243,7 +243,7 @@ func (this *partition) removeNode(nodeId uint64) {
 }
 
 func (this *partition) insertValue(notificationId uuid.UUID, id uint64, value []float32, level int) error {
-	err := this.index.Insert(id, value, level);
+	err := this.index.Insert(id, value, nil, level);
 	this.insertNotifications.Notify(notificationId, err)
 	return nil
 }

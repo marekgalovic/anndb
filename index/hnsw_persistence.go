@@ -51,6 +51,9 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 		if err := binary.Write(w, binary.BigEndian, spaceToSpaceIdx(this.space)); err != nil {
 			return err
 		}
+		if err := this.metadataSchema.save(w); err != nil {
+			return err
+		}
 	}
 
 	if this.Len() == 0 {
@@ -80,6 +83,9 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 				return err
 			}
 			if err := vertex.vector.Save(w); err != nil {
+				return err
+			}
+			if err := vertex.metadata.save(w, this.metadataSchema); err != nil {
 				return err
 			}
 		}
@@ -138,6 +144,10 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 		}
 		this.size = uint(size)
 		this.space = space
+
+		if err := this.metadataSchema.load(r); err != nil {
+			return err
+		}
 	}
 
 	var id, neighborId, entrypointId uint64
@@ -168,11 +178,18 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 			if err := binary.Read(r, binary.BigEndian, &level); err != nil {
 				return err
 			}
+
 			vector := make(math.Vector, this.size);
 			if err := vector.Load(r); err != nil {
 				return err
 			}
-			verticesShard[id] = newHnswVertex(id, vector, int(level))
+
+			var metadata Metadata
+			if err := metadata.load(r, this.metadataSchema); err != nil {
+				return err
+			}
+
+			verticesShard[id] = newHnswVertex(id, vector, metadata, int(level))
 		}
 	}
 

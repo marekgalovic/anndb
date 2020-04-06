@@ -25,7 +25,7 @@ func worker(ctx context.Context, index *index.Hnsw, tasks <- chan int64) {
 		select {
 		case id := <- tasks:
 			if id >= 0 {
-				err = index.Insert(uint64(id), math.RandomUniformVector(dim), index.RandomLevel())
+				err = index.Insert(uint64(id), math.RandomUniformVector(dim), nil, index.RandomLevel())
 				if err == nil {
 					atomic.AddUint64(&inserts, 1)
 				}
@@ -45,7 +45,7 @@ func main() {
 	numThreads := runtime.NumCPU()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	idx := index.NewHnsw(uint(dim), space.NewEuclidean());
+	idx := index.NewHnsw(uint(dim), space.NewEuclidean(), nil);
 	queue := make(chan int64)
 	for i := 0; i < numThreads; i++ {
 		go worker(ctx, idx, queue)

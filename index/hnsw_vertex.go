@@ -11,16 +11,18 @@ type hnswEdgeSet map[*hnswVertex]float32
 type hnswVertex struct {
     id uint64
     vector math.Vector
+    metadata Metadata
     level int
     deleted uint32
     edges []hnswEdgeSet
     edgeMutexes []*sync.RWMutex
 }
 
-func newHnswVertex(id uint64, vector math.Vector, level int) *hnswVertex {
+func newHnswVertex(id uint64, vector math.Vector, metadata Metadata, level int) *hnswVertex {
     vertex := &hnswVertex {
         id: id,
         vector: vector,
+        metadata: metadata,
         level: level,
         deleted: 0,
     }
