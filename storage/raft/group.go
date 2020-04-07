@@ -131,6 +131,10 @@ func (this *RaftGroup) RegisterSnapshotFn(fn SnapshotFn) error {
 	return nil
 }
 
+func (this *RaftGroup) LeaderId() uint64 {
+	return this.raftLeaderId
+}
+
 func (this *RaftGroup) Propose(ctx context.Context, data []byte) error {
 	return this.raft.Propose(ctx, data)
 }
@@ -206,7 +210,7 @@ func (this *RaftGroup) run() {
 }
 
 func (this *RaftGroup) isLeader() bool {
-	return this.raftLeaderId == this.transport.NodeId()
+	return this.LeaderId() == this.transport.NodeId()
 }
 
 func (this *RaftGroup) receive(messages []raftpb.Message) error {

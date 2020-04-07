@@ -1,15 +1,15 @@
 package main
 
 import (
-	"os";
-	"bufio";
+	// "os";
+	// "bufio";
 	"flag";
 	"time";
 	"context";
 	// "io";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
-	// "github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/math";
 
 	"github.com/satori/go.uuid";
 	"google.golang.org/grpc";
@@ -27,42 +27,50 @@ func main() {
 	}
 	defer conn.Close()
 
+	conn2, err := grpc.Dial(":6002", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn2.Close()
+
 	var sentAt time.Time
 
 	datasetManager := pb.NewDatasetManagerClient(conn)
-	// dataManager := pb.NewDataManagerClient(conn)
+	dataManager := pb.NewDataManagerClient(conn2)
 	// search := pb.NewSearchClient(conn)
 
 	sentAt = time.Now()
 	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
 		Dimension: 32,
 		PartitionCount: 1,
-		ReplicationFactor: 3,
+		ReplicationFactor: 1,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 	id := uuid.Must(uuid.FromBytes(dataset.GetId()))
 	log.Info(id, time.Since(sentAt))
-	time.Sleep(100 * time.Millisecond)
 
-	log.Info("Press ENTER to delete the dataset.")
-	bufio.NewReader(os.Stdin).ReadBytes('\n') 
 
-	sentAt = time.Now()
-	_, err = datasetManager.Delete(context.Background(), &pb.UUIDRequest {
-		Id: id.Bytes(),
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Info(id, time.Since(sentAt))
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(2 * time.Second)
+
+	// log.Info("Press ENTER to delete the dataset.")
+	// bufio.NewReader(os.Stdin).ReadBytes('\n') 
+
+	// sentAt = time.Now()
+	// _, err = datasetManager.Delete(context.Background(), &pb.UUIDRequest {
+	// 	Id: id.Bytes(),
+	// })
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// log.Info(id, time.Since(sentAt))
+	// time.Sleep(100 * time.Millisecond)
 
 	
 	// time.Sleep(1 * time.Second)
 
-	// // id := uuid.Must(uuid.FromString("144cda2f-4c66-464c-8f25-dbbfdeba2f7b"))
+	// id := uuid.Must(uuid.FromString("e9e1c34f-fa30-4fa4-aa29-492266ceed6d"))
 
 	// dataset, err = datasetManager.Get(context.Background(), &pb.UUIDRequest{Id: id.Bytes()})
 	// if err != nil {
@@ -73,18 +81,18 @@ func main() {
 	// 	log.Info(uuid.Must(uuid.FromBytes(partition.GetId())), partition.GetNodeIds())
 	// }
 
-	// sentAt = time.Now()
-	// for i := 0; i < 1000; i++ {
-	// 	_, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
-	// 		DatasetId: id.Bytes(),
-	// 		Id: uint64(i),
-	// 		Value: math.RandomUniformVector(32),
-	// 	})
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// }
-	// log.Infof("Insert 1000 items: %s", time.Since(sentAt))
+	sentAt = time.Now()
+	for i := 0; i < 1000; i++ {
+		_, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
+			DatasetId: id.Bytes(),
+			Id: uint64(i),
+			Value: math.RandomUniformVector(32),
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	log.Infof("Insert 1000 items: %s", time.Since(sentAt))
 
 	// time.Sleep(1 * time.Second)
 

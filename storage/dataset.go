@@ -34,6 +34,8 @@ type Dataset struct {
 
 	searchClients map[uint64]pb.SearchClient
 	searchClientsMu *sync.RWMutex
+	dataManagerClients map[uint64]pb.DataManagerClient
+	dataManagerClientsMu *sync.RWMutex
 }
 
 func newDataset(id uuid.UUID, meta pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, datasetManager *DatasetManager) (*Dataset, error) {
@@ -46,6 +48,8 @@ func newDataset(id uuid.UUID, meta pb.Dataset, raftWalDB *badger.DB, raftTranspo
 		partitionsMu: &sync.RWMutex{},
 		searchClients: make(map[uint64]pb.SearchClient),
 		searchClientsMu: &sync.RWMutex{},
+		dataManagerClients: make(map[uint64]pb.DataManagerClient),
+		dataManagerClientsMu: &sync.RWMutex{},
 	}
 
 	for i := 0; i < int(meta.GetPartitionCount()); i++ {
@@ -79,10 +83,39 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector) e
 		return err
 	}
 
-	return this.getPartitionForId(id).insert(ctx, id, value)
+	partition := this.getPartitionForId(id)
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		// Proxy the request to the partition leader
+		client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+		if err != nil {
+			return nil
+		}
+		_, err = client.Insert(ctx, &pb.InsertRequest{
+			DatasetId: this.id.Bytes(),
+			Id: id,
+			Value: value,
+		})
+		return err
+	}
+
+	return partition.insert(ctx, id, value)
 }
 
 func (this *Dataset) Remove(ctx context.Context, id uint64) error {
+	partition := this.getPartitionForId(id)
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		// Proxy the request to the partition leader
+		client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+		if err != nil {
+			return nil
+		}
+		_, err = client.Remove(ctx, &pb.RemoveRequest{
+			DatasetId: this.id.Bytes(),
+			Id: id,
+		})
+		return err
+	}
+
 	return this.getPartitionForId(id).remove(ctx, id)
 }
 
@@ -292,6 +325,34 @@ func (this *Dataset) getCachedNodeSearchClient(nodeId uint64) pb.SearchClient {
 	defer this.searchClientsMu.RUnlock()
 
 	if client, exists := this.searchClients[nodeId]; exists {
+		return client
+	}
+	return nil
+}
+
+func (this *Dataset) getDataManagerClient(ctx context.Context, nodeId uint64) (pb.DataManagerClient, error) {
+	client := this.getCachedDataManagerClient(nodeId)
+	if client != nil {
+		return client, nil
+	}
+
+	conn, err := this.clusterConn.Dial(nodeId)
+	if err != nil {
+		return nil, err
+	}
+
+	this.dataManagerClientsMu.Lock()
+	defer this.dataManagerClientsMu.Unlock()
+
+	this.dataManagerClients[nodeId] = pb.NewDataManagerClient(conn)
+	return this.dataManagerClients[nodeId], nil
+}
+
+func (this *Dataset) getCachedDataManagerClient(nodeId uint64) pb.DataManagerClient {
+	this.dataManagerClientsMu.RLock()
+	defer this.dataManagerClientsMu.RUnlock()
+
+	if client, exists := this.dataManagerClients[nodeId]; exists {
 		return client
 	}
 	return nil

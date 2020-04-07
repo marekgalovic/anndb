@@ -6,6 +6,7 @@ import (
 	"bytes";
 	"errors";
 	"sync";
+	"math/rand";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/math";
@@ -289,4 +290,18 @@ func (this *partition) snapshot() ([]byte, error) {
 
 func (this *partition) isUnderReplicated() bool {
 	return len(this.nodeIds()) < int(this.dataset.Meta().GetReplicationFactor())
+}
+
+func (this *partition) isOnNode(nodeId uint64) bool {
+	for _, id := range this.nodeIds() {
+		if id == nodeId {
+			return true
+		}
+	}
+	return false
+}
+
+func (this *partition) randomNodeId() uint64 {
+	nodeIds := this.nodeIds()
+	return nodeIds[rand.Intn(len(nodeIds))]
 }

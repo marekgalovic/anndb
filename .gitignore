@@ -1,7 +1,6 @@
 .DS_Store
 data/*
 bin/*
-python/*
 
 # Binaries for programs and plugins
 *.exe
