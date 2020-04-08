@@ -129,6 +129,17 @@ func (this *Hnsw) Get(id uint64) (math.Vector, error) {
 	return nil, ItemNotFoundError
 }
 
+func (this *Hnsw) GetVertex(id uint64) (*hnswVertex, error) {
+    m, mu := this.getVerticesShard(id)
+    mu.RLock()
+    defer mu.RUnlock()
+
+    if vertex, exists := m[id]; exists {
+        return vertex, nil
+    }
+    return nil, ItemNotFoundError
+}
+
 func (this *Hnsw) Remove(id uint64) error {
     vertex, err := this.removeVertex(id)
     if err != nil {

@@ -12,10 +12,17 @@ service DatasetManager {
 
 service DataManager {
 	rpc Insert(InsertRequest) returns (EmptyMessage);
+	rpc Update(UpdateRequest) returns (EmptyMessage);
 	rpc Remove(RemoveRequest) returns (EmptyMessage);
 }
 
 message InsertRequest {
+	bytes dataset_id = 1;
+	uint64 id = 2;
+	repeated float value = 3;
+}
+
+message UpdateRequest {
 	bytes dataset_id = 1;
 	uint64 id = 2;
 	repeated float value = 3;
@@ -71,8 +78,9 @@ message DatasetPartitionNodesChange {
 }
 
 enum PartitionChangeType {
-	InsertValue = 0;
-	DeleteValue = 1;
+	PartitionChangeInsertValue = 0;
+	PartitionChangeUpdateValue = 1;
+	PartitionChangeDeleteValue = 2;
 }
 
 message PartitionChange {

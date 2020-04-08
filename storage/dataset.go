@@ -90,7 +90,7 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector) e
 		if err != nil {
 			return nil
 		}
-		_, err = client.Insert(ctx, &pb.InsertRequest{
+		_, err = client.Insert(ctx, &pb.InsertRequest {
 			DatasetId: this.id.Bytes(),
 			Id: id,
 			Value: value,
@@ -101,6 +101,29 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector) e
 	return partition.insert(ctx, id, value)
 }
 
+func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector) error {
+	if err := this.checkDimension(&value); err != nil {
+		return err
+	}
+
+	partition := this.getPartitionForId(id)
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		// Proxy the request to the partition leader
+		client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+		if err != nil {
+			return nil
+		}
+		_, err = client.Update(ctx, &pb.UpdateRequest {
+			DatasetId: this.id.Bytes(),
+			Id: id,
+			Value: value,
+		})
+		return err
+	}
+
+	return partition.update(ctx, id, value)
+}
+
 func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 	partition := this.getPartitionForId(id)
 	if !partition.isOnNode(this.clusterConn.Id()) {
@@ -109,7 +132,7 @@ func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 		if err != nil {
 			return nil
 		}
-		_, err = client.Remove(ctx, &pb.RemoveRequest{
+		_, err = client.Remove(ctx, &pb.RemoveRequest {
 			DatasetId: this.id.Bytes(),
 			Id: id,
 		})

@@ -31,6 +31,18 @@ func newHnswVertex(id uint64, vector math.Vector, metadata Metadata, level int) 
     return vertex
 }
 
+func (this *hnswVertex) Id() uint64 {
+    return this.id
+}
+
+func (this *hnswVertex) Vector() math.Vector {
+    return this.vector
+}
+
+func (this *hnswVertex) Level() int {
+    return this.level
+}
+
 func (this *hnswVertex) setLevel(level int) {
     this.edges = make([]hnswEdgeSet, level + 1)
     this.edgeMutexes = make([]*sync.RWMutex, level + 1)

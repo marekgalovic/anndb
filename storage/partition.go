@@ -38,8 +38,7 @@ type partition struct {
 	datasetManager *DatasetManager
 	raftMu *sync.RWMutex
 
-	insertNotifications *utils.Notificator
-	deleteNotifications *utils.Notificator
+	notificator *utils.Notificator
 
 	log *log.Entry
 }
@@ -69,8 +68,7 @@ func newPartition(id uuid.UUID, meta *pb.Partition, dataset *Dataset, raftWalDB 
 		raftTransport: raftTransport,
 		datasetManager: datasetManager,
 		raftMu: &sync.RWMutex{},
-		insertNotifications: utils.NewNotificator(),
-		deleteNotifications: utils.NewNotificator(),
+		notificator: utils.NewNotificator(),
 		log: log.WithFields(log.Fields {
 			"partition_id": id,
 		}),
@@ -139,11 +137,11 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
 	defer cancelCtx()
 
-	notifC, notifId := this.insertNotifications.Create()
-	defer func() { this.insertNotifications.Remove(notifId) }()
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_InsertValue,
+		Type: pb.PartitionChangeType_PartitionChangeInsertValue,
 		NotificationId: notifId.Bytes(),
 		Id: id,
 		Value: value,
@@ -169,15 +167,54 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 	}
 }
 
+func (this *partition) update(ctx context.Context, id uint64, value math.Vector) error {
+	this.raftMu.RLock()
+	defer this.raftMu.RUnlock()
+	if this.raft == nil {
+		return RaftNotLoadedOnNodeErr
+	}
+
+	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	defer cancelCtx()
+
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
+
+	proposal := &pb.PartitionChange {
+		Type: pb.PartitionChangeType_PartitionChangeUpdateValue,
+		NotificationId: notifId.Bytes(),
+		Id: id,
+		Value: value,
+	}
+	proposalData, err := proto.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
+		return err
+	}
+
+	select {
+	case err := <- notifC:
+		if err != nil {
+			return err.(error)
+		}
+		return nil
+	case <- ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (this *partition) remove(ctx context.Context, id uint64) error {
 	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
 	defer cancelCtx()
 
-	notifC, notifId := this.insertNotifications.Create()
-	defer func() { this.insertNotifications.Remove(notifId) }()
+	notifC, notifId := this.notificator.Create()
+	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_DeleteValue,
+		Type: pb.PartitionChangeType_PartitionChangeDeleteValue,
 		NotificationId: notifId.Bytes(),
 		Id: id,
 	}
@@ -245,13 +282,28 @@ func (this *partition) removeNode(nodeId uint64) {
 
 func (this *partition) insertValue(notificationId uuid.UUID, id uint64, value []float32, level int) error {
 	err := this.index.Insert(id, value, nil, level);
-	this.insertNotifications.Notify(notificationId, err)
+	this.notificator.Notify(notificationId, err)
+	return nil
+}
+
+func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value []float32) error {
+	vertex, err := this.index.GetVertex(id)
+	if err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+	if err := this.index.Remove(id); err != nil {
+		this.notificator.Notify(notificationId, err)
+		return nil
+	}
+	err = this.index.Insert(id, value, nil, vertex.Level())
+	this.notificator.Notify(notificationId, err)
 	return nil
 }
 
 func (this *partition) deleteValue(notificationId uuid.UUID, id uint64) error {
 	err := this.index.Remove(id);
-	this.deleteNotifications.Notify(notificationId, err)
+	this.notificator.Notify(notificationId, err)
 	return nil
 }
 
@@ -267,9 +319,11 @@ func (this *partition) process(data []byte) error {
 	}
 
 	switch change.Type {
-	case pb.PartitionChangeType_InsertValue:
+	case pb.PartitionChangeType_PartitionChangeInsertValue:
 		return this.insertValue(notificationId, change.GetId(), change.GetValue(), int(change.GetLevel()))
-	case pb.PartitionChangeType_DeleteValue:
+	case pb.PartitionChangeType_PartitionChangeUpdateValue:
+		return this.updateValue(notificationId, change.GetId(), change.GetValue())
+	case pb.PartitionChangeType_PartitionChangeDeleteValue:
 		return this.deleteValue(notificationId, change.GetId())
 	}
 
