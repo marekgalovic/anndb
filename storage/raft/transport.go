@@ -4,6 +4,7 @@ import (
 	"context";
 	"sync";
 	"errors";
+	"time";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/cluster";
@@ -64,14 +65,12 @@ func (this *RaftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*p
 		return nil, err
 	}
 
-	messages := make([]raftpb.Message, len(req.GetMessages()))
-	for i, msgBytes := range req.GetMessages() {
-		if err := proto.Unmarshal(msgBytes, &messages[i]); err != nil {
-			return nil, err
-		}
+	var message raftpb.Message
+	if err := proto.Unmarshal(req.GetMessage(), &message); err != nil {
+		return nil, err
 	}
 
-	if err := group.receive(messages); err != nil {
+	if err := group.receive(message); err != nil {
 		return nil, err
 	}
 
@@ -79,32 +78,38 @@ func (this *RaftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*p
 }
 
 func (this *RaftTransport) Send(ctx context.Context, group *RaftGroup, messages []raftpb.Message) {
-	for nodeId, nodeMessages := range this.groupMessagesByRecipient(&messages) {
-		payload, containsSnapshot, err := this.buildRaftMessage(group.id, nodeMessages)
+	for _, m := range messages {
+		mBytes, err := m.Marshal()
 		if err != nil {
 			log.Error(err)
 			continue
 		}
 
-		client, err := this.getNodeRaftTransportClient(nodeId)
+		client, err := this.getNodeRaftTransportClient(m.To)
 		if err != nil {
-			log.Warn(err)
-			group.reportUnreachable(nodeId)
-			if containsSnapshot {
-				group.reportSnapshot(nodeId, etcdRaft.SnapshotFailure)
+			group.reportUnreachable(m.To)
+			if m.Type == raftpb.MsgSnap {
+				group.reportSnapshot(m.To, etcdRaft.SnapshotFailure)
 			}
 			continue
 		}
 
-		if _, err := client.Receive(ctx, payload); err != nil {
-			group.reportUnreachable(nodeId)
-			if containsSnapshot {
-				group.reportSnapshot(nodeId, etcdRaft.SnapshotFailure)
+		payload := &pb.RaftMessage {
+			GroupId: group.id.Bytes(),
+			Message: mBytes,
+		}
+
+		sendCtx, _ := context.WithTimeout(ctx, 500 * time.Millisecond)
+		if _, err := client.Receive(sendCtx, payload); err != nil {
+			group.reportUnreachable(m.To)
+			if m.Type == raftpb.MsgSnap {
+				group.reportSnapshot(m.To, etcdRaft.SnapshotFailure)
 			}
 			continue
 		}
-		if containsSnapshot {
-			group.reportSnapshot(nodeId, etcdRaft.SnapshotFinish)
+
+		if m.Type == raftpb.MsgSnap {
+			group.reportSnapshot(m.To, etcdRaft.SnapshotFinish)
 		}
 	}
 }
@@ -150,35 +155,6 @@ func (this *RaftTransport) getGroup(id uuid.UUID) (*RaftGroup, error) {
 		return nil, GroupNotFoundError
 	}
 	return group, nil
-}
-
-func (this *RaftTransport) groupMessagesByRecipient(messages *[]raftpb.Message) map[uint64][]*raftpb.Message {
-	grouped := make(map[uint64][]*raftpb.Message)
-	for _, message := range *messages {
-		if _, exists := grouped[message.To]; !exists {
-			grouped[message.To] = make([]*raftpb.Message, 0)
-		}
-		grouped[message.To] = append(grouped[message.To], &message)
-	}
-	return grouped
-}
-
-func (this *RaftTransport) buildRaftMessage(groupId uuid.UUID, messages []*raftpb.Message) (*pb.RaftMessage, bool, error) {
-	var err error
-	var containsSnapshot bool = false
-	messageBytes := make([][]byte, len(messages))
-	for i, message := range messages {
-		containsSnapshot = containsSnapshot || (message.Type == raftpb.MsgSnap)
-		messageBytes[i], err = proto.Marshal(message)
-		if err != nil {
-			return nil, containsSnapshot, err
-		}
-	}
-
-	return &pb.RaftMessage {
-		GroupId: groupId.Bytes(),
-		Messages: messageBytes,
-	}, containsSnapshot, nil
 }
 
 func (this *RaftTransport) getNodeRaftTransportClient(nodeId uint64) (pb.RaftTransportClient, error) {

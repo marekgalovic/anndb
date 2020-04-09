@@ -6,7 +6,7 @@ import (
 	"flag";
 	"time";
 	"context";
-	// "io";
+	"io";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/math";
@@ -27,23 +27,17 @@ func main() {
 	}
 	defer conn.Close()
 
-	conn2, err := grpc.Dial(":6002", grpc.WithInsecure())
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn2.Close()
-
 	var sentAt time.Time
 
 	datasetManager := pb.NewDatasetManagerClient(conn)
-	dataManager := pb.NewDataManagerClient(conn2)
-	// search := pb.NewSearchClient(conn)
+	dataManager := pb.NewDataManagerClient(conn)
+	search := pb.NewSearchClient(conn)
 
 	sentAt = time.Now()
 	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
 		Dimension: 32,
-		PartitionCount: 1,
-		ReplicationFactor: 1,
+		PartitionCount: 5,
+		ReplicationFactor: 3,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -82,14 +76,20 @@ func main() {
 	// }
 
 	sentAt = time.Now()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100000; i++ {
+		RETRY:
 		_, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
 			DatasetId: id.Bytes(),
 			Id: uint64(i),
 			Value: math.RandomUniformVector(32),
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
+			goto RETRY
+		}
+		if i % 1000 == 0 {
+			log.Info(i)
+			time.Sleep(1 * time.Second)
 		}
 	}
 	log.Infof("Insert 1000 items: %s", time.Since(sentAt))
@@ -98,28 +98,28 @@ func main() {
 
 	// // id := uuid.Must(uuid.FromString("e935acfe-b17a-494a-b315-365fd4fac11f"))
 
-	// sentAt = time.Now()
-	// stream, err := search.Search(context.Background(), &pb.SearchRequest {
-	// 	DatasetId: id.Bytes(),
-	// 	Query: math.RandomUniformVector(32),
-	// 	K: 10,
-	// })
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	sentAt = time.Now()
+	stream, err := search.Search(context.Background(), &pb.SearchRequest {
+		DatasetId: id.Bytes(),
+		Query: math.RandomUniformVector(32),
+		K: 10,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// for {
-	// 	item, err := stream.Recv()
-	// 	if err == io.EOF {
-	// 		break
-	// 	}
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	log.Info(item.Id, item.Score)
-	// }
+	for {
+		item, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Info(item.Id, item.Score)
+	}
 
-	// log.Info(time.Since(sentAt))
+	log.Info(time.Since(sentAt))
 
 	// for i := 0; i < 1000; i++ {
 	// 	sentAt = time.Now()

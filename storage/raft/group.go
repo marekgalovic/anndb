@@ -15,7 +15,7 @@ import (
 	log "github.com/sirupsen/logrus";
 )
 
-const snapshotOffset uint64 = 100
+const snapshotOffset uint64 = 5000
 
 var (
 	ProcessFnAlreadyRegisteredErr error = errors.New("ProcessFn already registered")
@@ -177,10 +177,12 @@ func (this *RaftGroup) run() {
 			if rd.SoftState != nil {
 				this.raftLeaderId = atomic.LoadUint64(&rd.SoftState.Lead)
 			}
+			if this.isLeader() {
+				this.transport.Send(this.ctx, this, rd.Messages)
+			}
 			if err := this.wal.Save(rd.HardState, rd.Entries, rd.Snapshot); err != nil {
 				this.log.Fatal(err)
 			}
-			this.transport.Send(this.ctx, this, rd.Messages)
 			if !etcdRaft.IsEmptySnap(rd.Snapshot) {
 				if err := this.processSnapshotFn(rd.Snapshot.Data); err != nil {
 					this.log.Fatal(err)
@@ -201,6 +203,9 @@ func (this *RaftGroup) run() {
 				}
 				lastAppliedIdx = entry.Index
 			}
+			if !this.isLeader() {
+				this.transport.Send(this.ctx, this, rd.Messages)
+			}
 			this.raft.Advance()
 		case <- this.ctx.Done():
 			this.log.Info("Stop Raft")
@@ -213,13 +218,8 @@ func (this *RaftGroup) isLeader() bool {
 	return this.LeaderId() == this.transport.NodeId()
 }
 
-func (this *RaftGroup) receive(messages []raftpb.Message) error {
-	for _, msg := range messages {
-		if err := this.raft.Step(this.ctx, msg); err != nil {
-			return err
-		}
-	}
-	return nil
+func (this *RaftGroup) receive(message raftpb.Message) error {
+	return this.raft.Step(this.ctx, message)
 }
 
 func (this *RaftGroup) reportUnreachable(nodeId uint64) {
@@ -265,11 +265,15 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx, skip uint64) error {
 		return nil
 	}
 
+	startAt := time.Now()
 	snapshotData, err := this.snapshotFn()
 	if err != nil {
 		return err
 	}
 
 	_, err = this.wal.CreateSnapshot(lastCommittedIdx, this.raftConfState, snapshotData)
+	if err == nil {
+		this.log.Infof("Snapshot. Size: %d bytes. Took: %s", len(snapshotData), time.Since(startAt))
+	}
 	return err
 }

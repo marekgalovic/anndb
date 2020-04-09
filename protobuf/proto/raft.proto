@@ -9,5 +9,5 @@ service RaftTransport {
 
 message RaftMessage {
 	bytes group_id = 1;
-	repeated bytes messages = 2;
+	bytes message = 2;
 }

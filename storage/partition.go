@@ -22,6 +22,8 @@ import (
 	log "github.com/sirupsen/logrus";
 )
 
+const proposalTimeout time.Duration = 5 * time.Second
+
 var (
 	RaftNotLoadedOnNodeErr error = errors.New("Raft is not loaded on this node")
 )
@@ -134,7 +136,7 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 		return RaftNotLoadedOnNodeErr
 	}
 
-	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	ctx, cancelCtx := context.WithTimeout(ctx, proposalTimeout)
 	defer cancelCtx()
 
 	notifC, notifId := this.notificator.Create()
@@ -174,7 +176,7 @@ func (this *partition) update(ctx context.Context, id uint64, value math.Vector)
 		return RaftNotLoadedOnNodeErr
 	}
 
-	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	ctx, cancelCtx := context.WithTimeout(ctx, proposalTimeout)
 	defer cancelCtx()
 
 	notifC, notifId := this.notificator.Create()
@@ -207,7 +209,7 @@ func (this *partition) update(ctx context.Context, id uint64, value math.Vector)
 }
 
 func (this *partition) remove(ctx context.Context, id uint64) error {
-	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
+	ctx, cancelCtx := context.WithTimeout(ctx, proposalTimeout)
 	defer cancelCtx()
 
 	notifC, notifId := this.notificator.Create()
