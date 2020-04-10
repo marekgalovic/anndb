@@ -192,7 +192,7 @@ func (this *dataManagerServer) PartitionBatchRemove(ctx context.Context, req *pb
 }
 
 func (this *dataManagerServer) errorsMapToBatchResponse(m map[uint64]error) map[uint64]string {
-	var result map[uint64]string
+	result := make(map[uint64]string)
 	for id, err := range m {
 		result[id] = fmt.Sprintf("%s", err)
 	}

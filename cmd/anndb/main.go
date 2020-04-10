@@ -68,10 +68,15 @@ func main() {
 		log.Fatal(err)
 	}
 	defer zeroGroup.Stop()
+	// Create shared raft group on top of the zero group
+	sharedGroup, err := raft.NewSharedGroup(zeroGroup)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	nodesManager := raft.NewNodesManager(clusterConn, zeroGroup)
 
-	datasetManager, err := storage.NewDatasetManager(zeroGroup, db, raftTransport, clusterConn, allocator)
+	datasetManager, err := storage.NewDatasetManager(sharedGroup.Get("datasets"), db, raftTransport, clusterConn, allocator)
 	if err != nil {
 		log.Fatal(err)
 	}

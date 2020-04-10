@@ -22,7 +22,7 @@ var (
 )
 
 type DatasetManager struct {
-	zeroGroup *raft.RaftGroup
+	raft raft.Group
 	raftWalDB *badger.DB
 	raftTransport *raft.RaftTransport
 	clusterConn *cluster.Conn
@@ -34,9 +34,9 @@ type DatasetManager struct {
 	notificator *utils.Notificator
 }
 
-func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *allocator) (*DatasetManager, error) {
+func NewDatasetManager(raft raft.Group, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *allocator) (*DatasetManager, error) {
 	dm := &DatasetManager {
-		zeroGroup: zeroGroup,
+		raft: raft,
 		raftWalDB: raftWalDB,
 		raftTransport: raftTransport,
 		clusterConn: clusterConn,
@@ -48,13 +48,13 @@ func NewDatasetManager(zeroGroup *raft.RaftGroup, raftWalDB *badger.DB, raftTran
 		notificator: utils.NewNotificator(),
 	}
 
-	if err := zeroGroup.RegisterProcessFn(dm.process); err != nil {
+	if err := raft.RegisterProcessFn(dm.process); err != nil {
 		return nil, err
 	}
-	if err := zeroGroup.RegisterProcessSnapshotFn(dm.processSnapshot); err != nil {
+	if err := raft.RegisterProcessSnapshotFn(dm.processSnapshot); err != nil {
 		return nil, err
 	}
-	if err := zeroGroup.RegisterSnapshotFn(dm.snapshot); err != nil {
+	if err := raft.RegisterSnapshotFn(dm.snapshot); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 		return nil, err
 	}
 
-	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
-	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
 		return err
 	}
 
@@ -320,7 +320,7 @@ func (this *DatasetManager) proposePartitionNodesChangeAndWaitForCommit(ctx cont
 	if err != nil {
 		return err
 	}
-	if err := this.zeroGroup.Propose(ctx, proposalData); err != nil {
+	if err := this.raft.Propose(ctx, proposalData); err != nil {
 		return err
 	}
 

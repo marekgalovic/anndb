@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt";
 	"sync";
 	"errors";
 
@@ -36,6 +37,8 @@ type Conn struct {
 	notificationsMu *sync.RWMutex
 
 	transportCredentials credentials.TransportCredentials
+
+	log *log.Entry
 }
 
 func NewConn(id uint64, address string, tlsCertFile string) (*Conn, error) {
@@ -48,6 +51,9 @@ func NewConn(id uint64, address string, tlsCertFile string) (*Conn, error) {
 		connsMu: sync.RWMutex{},
 		notifications: make([]chan *nodesChange, 0),
 		notificationsMu: &sync.RWMutex{},
+		log: log.WithFields(log.Fields {
+			"node_id": fmt.Sprintf("%16x", id),
+		}),
 	}
 
 	if tlsCertFile != "" {
@@ -124,12 +130,12 @@ func (this *Conn) AddNode(id uint64, address string) {
 
 	if _, exists := this.addresses[id]; !exists {
 		this.addresses[id] = address
+		this.sendNodesChangeNotification(&nodesChange {
+			Type: NodesChangeAddNode,
+			NodeId: id,
+		})
+		this.log.Infof("Conn: Added node: %16x", id)
 	}
-
-	this.sendNodesChangeNotification(&nodesChange {
-		Type: NodesChangeAddNode,
-		NodeId: id,
-	})
 }
 
 func (this *Conn) RemoveNode(id uint64) {
@@ -138,18 +144,20 @@ func (this *Conn) RemoveNode(id uint64) {
 	this.connsMu.Lock()
 	defer this.connsMu.Unlock()
 
-	delete(this.addresses, id)
-	if conn, exists := this.conns[id]; exists {
-		if err := conn.Close(); err != nil {
-			log.Error(err)
+	if _, exists := this.addresses[id]; exists {
+		delete(this.addresses, id)
+		if conn, exists := this.conns[id]; exists {
+			if err := conn.Close(); err != nil {
+				log.Error(err)
+			}
+			delete(this.conns, id)
 		}
-		delete(this.conns, id)
+		this.sendNodesChangeNotification(&nodesChange {
+			Type: NodesChangeRemoveNode,
+			NodeId: id,
+		})
+		this.log.Infof("Conn: Removed node: %16x", id)
 	}
-
-	this.sendNodesChangeNotification(&nodesChange {
-		Type: NodesChangeRemoveNode,
-		NodeId: id,
-	})
 }
 
 func (this *Conn) Dial(id uint64) (*grpc.ClientConn, error) {
