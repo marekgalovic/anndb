@@ -18,9 +18,12 @@ import (
 	badger "github.com/dgraph-io/badger/v2";
 )
 
+const maxBatchRequestSize int = 100
+
 var (
 	DimensionMissmatchErr error = errors.New("Value dimension does not match dataset dimension")
 	PartitionNotFoundErr error = errors.New("Partition not found")
+	BatchRequestTooLargerErr error = errors.New("Batch request too large")
 )
 
 type partitionBatchResult map[uint64]error
@@ -147,6 +150,10 @@ func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 }
 
 func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	if len(items) > maxBatchRequestSize {
+		return nil, BatchRequestTooLargerErr
+	}
+
 	errors := make(map[uint64]error)
 	var checkedItems []*pb.BatchItem
 	for _, item := range items {
@@ -186,6 +193,10 @@ func (this *Dataset) PartitionBatchInsert(ctx context.Context, partitionId uuid.
 }
 
 func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	if len(items) > maxBatchRequestSize {
+		return nil, BatchRequestTooLargerErr
+	}
+
 	errors := make(map[uint64]error)
 	var checkedItems []*pb.BatchItem
 	for _, item := range items {
@@ -225,6 +236,10 @@ func (this *Dataset) PartitionBatchUpdate(ctx context.Context, partitionId uuid.
 }
 
 func (this *Dataset) BatchRemove(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	if len(items) > maxBatchRequestSize {
+		return nil, BatchRequestTooLargerErr
+	}
+
 	return this.partitionsBatchRequest(
 		ctx, items,
 		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
