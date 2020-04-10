@@ -14,6 +14,12 @@ service DataManager {
 	rpc Insert(InsertRequest) returns (EmptyMessage);
 	rpc Update(UpdateRequest) returns (EmptyMessage);
 	rpc Remove(RemoveRequest) returns (EmptyMessage);
+	rpc BatchInsert(BatchRequest) returns (BatchResponse);
+	rpc BatchUpdate(BatchRequest) returns (BatchResponse);
+	rpc BatchRemove(BatchRequest) returns (BatchResponse);
+	rpc PartitionBatchInsert(PartitionBatchRequest) returns (BatchResponse);
+	rpc PartitionBatchUpdate(PartitionBatchRequest) returns (BatchResponse);
+	rpc PartitionBatchRemove(PartitionBatchRequest) returns (BatchResponse);
 }
 
 message InsertRequest {
@@ -31,6 +37,27 @@ message UpdateRequest {
 message RemoveRequest {
 	bytes dataset_id = 1;
 	uint64 id = 2;
+}
+
+message BatchItem {
+	uint64 id = 1;
+	repeated float value = 2;
+	int32 level = 3;
+}
+
+message BatchRequest {
+	bytes dataset_id = 1;
+	repeated BatchItem items = 2;
+}
+
+message PartitionBatchRequest {
+	bytes dataset_id = 1;
+	bytes partition_id = 2;
+	repeated BatchItem items = 3;
+}
+
+message BatchResponse {
+	map<uint64, string> errors = 1;
 }
 
 enum Space {
@@ -81,6 +108,9 @@ enum PartitionChangeType {
 	PartitionChangeInsertValue = 0;
 	PartitionChangeUpdateValue = 1;
 	PartitionChangeDeleteValue = 2;
+	PartitionChangeBatchInsertValue = 3;
+	PartitionChangeBatchUpdateValue = 4;
+	PartitionChangeBatchDeleteValue = 5;
 }
 
 message PartitionChange {
@@ -89,6 +119,7 @@ message PartitionChange {
 	uint64 id = 3;
 	repeated float value = 4;
 	int32 level = 5;
+	repeated BatchItem batch_items = 6;
 }
 
 message DatasetManagerSnapshot {

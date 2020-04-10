@@ -36,7 +36,7 @@ func main() {
 	sentAt = time.Now()
 	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
 		Dimension: 32,
-		PartitionCount: 5,
+		PartitionCount: 1,
 		ReplicationFactor: 3,
 	})
 	if err != nil {
@@ -78,6 +78,29 @@ func main() {
 	sentAt = time.Now()
 	for i := 0; i < 100000; i++ {
 		RETRY:
+		// batchItems := make([]*pb.BatchItem, 100)
+		// for j := 0; j < 100; j++ {
+		// 	batchItems[j] = &pb.BatchItem {
+		// 		Id: uint64(i * 100 + j),
+		// 		Value: math.RandomUniformVector(32),
+		// 	}
+		// }
+
+		// resp, err := dataManager.BatchInsert(context.Background(), &pb.BatchRequest {
+		// 	DatasetId: id.Bytes(),
+		// 	Items: batchItems,
+		// })
+		// if err != nil {
+		// 	log.Error(err)
+		// 	goto RETRY
+		// }
+		// for id, errString := range resp.GetErrors() {
+		// 	log.Errorf("ID: %d, Err: %s", id, errString)
+		// }
+		// if i % 10 == 0 {
+		// 	log.Info(i)
+		// }
+
 		_, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
 			DatasetId: id.Bytes(),
 			Id: uint64(i),
@@ -89,7 +112,6 @@ func main() {
 		}
 		if i % 1000 == 0 {
 			log.Info(i)
-			time.Sleep(1 * time.Second)
 		}
 	}
 	log.Infof("Insert 1000 items: %s", time.Since(sentAt))

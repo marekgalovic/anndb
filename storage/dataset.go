@@ -23,6 +23,10 @@ var (
 	PartitionNotFoundErr error = errors.New("Partition not found")
 )
 
+type partitionBatchResult map[uint64]error
+type partitionBatchRequestRemoteFn func(pb.DataManagerClient, context.Context, *pb.PartitionBatchRequest) (*pb.BatchResponse, error)
+type partitionBatchRequestLocalFn func(*partition, context.Context, []*pb.BatchItem) (map[uint64]error, error)
+
 type Dataset struct {
 	id uuid.UUID
 	meta *pb.Dataset
@@ -140,6 +144,105 @@ func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 	}
 
 	return this.getPartitionForId(id).remove(ctx, id)
+}
+
+func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	errors := make(map[uint64]error)
+	var checkedItems []*pb.BatchItem
+	for _, item := range items {
+		value := math.Vector(item.GetValue())
+		if err := this.checkDimension(&value); err != nil {
+			errors[item.GetId()] = err
+		} else {
+			checkedItems = append(checkedItems, item)
+		}
+	}
+
+	errs, err := this.partitionsBatchRequest(
+		ctx, checkedItems,
+		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
+			return client.PartitionBatchInsert(ctx, req)
+		},
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+			return partition.batchInsert(ctx, items)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	for id, err := range errs {
+		errors[id] = err
+	}
+	return errors, nil
+}
+
+func (this *Dataset) PartitionBatchInsert(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+	partition, err := this.getPartition(partitionId)
+	if err != nil {
+		return nil, err
+	}
+
+	return partition.batchInsert(ctx, items)
+}
+
+func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	errors := make(map[uint64]error)
+	var checkedItems []*pb.BatchItem
+	for _, item := range items {
+		value := math.Vector(item.GetValue())
+		if err := this.checkDimension(&value); err != nil {
+			errors[item.GetId()] = err
+		} else {
+			checkedItems = append(checkedItems, item)
+		}
+	}
+
+	errs, err := this.partitionsBatchRequest(
+		ctx, checkedItems,
+		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
+			return client.PartitionBatchUpdate(ctx, req)
+		},
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+			return partition.batchUpdate(ctx, items)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	for id, err := range errs {
+		errors[id] = err
+	}
+	return errors, nil
+}
+
+func (this *Dataset) PartitionBatchUpdate(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+	partition, err := this.getPartition(partitionId)
+	if err != nil {
+		return nil, err
+	}
+
+	return partition.batchUpdate(ctx, items)
+}
+
+func (this *Dataset) BatchRemove(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+	return this.partitionsBatchRequest(
+		ctx, items,
+		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
+			return client.PartitionBatchRemove(ctx, req)
+		},
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+			return partition.batchRemove(ctx, items)
+		},
+	)
+}
+
+func (this *Dataset) PartitionBatchRemove(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+	partition, err := this.getPartition(partitionId)
+	if err != nil {
+		return nil, err
+	}
+
+	return partition.batchRemove(ctx, items)
 }
 
 func (this *Dataset) Search(ctx context.Context, query math.Vector, k uint) (index.SearchResult, error) {
@@ -323,6 +426,96 @@ func (this *Dataset) searchPartition(ctx context.Context, partition *partition, 
 		return
 	}
 	resultCh <- result
+}
+
+func (this *Dataset) groupBatchItemsByPartition(items []*pb.BatchItem) map[*partition][]*pb.BatchItem {
+	result := make(map[*partition][]*pb.BatchItem)
+	for _, item := range items {
+		partition := this.getPartitionForId(item.GetId())
+		if _, exists := result[partition]; !exists {
+			result[partition] = make([]*pb.BatchItem, 0)
+		}
+		result[partition] = append(result[partition], item)
+	}
+	return result
+}
+
+func (this *Dataset) partitionsBatchRequest(ctx context.Context, items []*pb.BatchItem, remoteFn partitionBatchRequestRemoteFn, localFn partitionBatchRequestLocalFn) (map[uint64]error, error) {
+	wg := &sync.WaitGroup{}
+	resultCh := make(chan partitionBatchResult)
+
+	partitionItems := this.groupBatchItemsByPartition(items)
+	for partition, items := range partitionItems {
+		wg.Add(1)
+		go this.handlePartitionBatchRequest(ctx, partition, items, wg, resultCh, remoteFn, localFn)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	errors := make(map[uint64]error)
+	for i := 0; i < len(partitionItems); i++ {
+		select {
+		case result := <- resultCh:
+			for id, err := range result {
+				errors[id] = err
+			}
+		case <- ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return errors, nil
+}
+
+func (this *Dataset) handlePartitionBatchRequest(ctx context.Context, partition *partition, items []*pb.BatchItem, wg *sync.WaitGroup, resultCh chan partitionBatchResult, remoteFn partitionBatchRequestRemoteFn, localFn partitionBatchRequestLocalFn) {
+	defer wg.Done()
+
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+		if err != nil {
+			resultCh <- this.errorToPartitionBatchResult(items, err)
+			return
+		}
+
+		resp, err := remoteFn(client, ctx, &pb.PartitionBatchRequest {
+			DatasetId: this.id.Bytes(),
+			PartitionId: partition.id.Bytes(),
+			Items: items,
+		})
+		if err != nil {
+			resultCh <- this.errorToPartitionBatchResult(items, err)
+			return
+		}
+		resultCh <- this.errorsResponseToPartitionBatchResult(resp.GetErrors())
+		return
+	}
+
+	errors, err := localFn(partition, ctx, items)
+	if err != nil {
+		resultCh <- this.errorToPartitionBatchResult(items, err)
+		return
+	}
+
+	resultCh <- partitionBatchResult(errors)
+	return
+}
+
+func (this *Dataset) errorToPartitionBatchResult(items []*pb.BatchItem, err error) partitionBatchResult {
+	result := make(partitionBatchResult)
+	for _, item := range items {
+		result[item.GetId()] = err
+	}
+	return result
+}
+
+func (this *Dataset) errorsResponseToPartitionBatchResult(errStrings map[uint64]string) partitionBatchResult {
+	result := make(partitionBatchResult)
+	for id, errString := range errStrings {
+		result[id] = errors.New(errString)
+	}
+	return result
 }
 
 func (this *Dataset) getNodeSearchClient(ctx context.Context, nodeId uint64) (pb.SearchClient, error) {

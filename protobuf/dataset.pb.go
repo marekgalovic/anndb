@@ -108,21 +108,30 @@ func (DatasetPartitionNodesChangeType) EnumDescriptor() ([]byte, []int) {
 type PartitionChangeType int32
 
 const (
-	PartitionChangeType_PartitionChangeInsertValue PartitionChangeType = 0
-	PartitionChangeType_PartitionChangeUpdateValue PartitionChangeType = 1
-	PartitionChangeType_PartitionChangeDeleteValue PartitionChangeType = 2
+	PartitionChangeType_PartitionChangeInsertValue      PartitionChangeType = 0
+	PartitionChangeType_PartitionChangeUpdateValue      PartitionChangeType = 1
+	PartitionChangeType_PartitionChangeDeleteValue      PartitionChangeType = 2
+	PartitionChangeType_PartitionChangeBatchInsertValue PartitionChangeType = 3
+	PartitionChangeType_PartitionChangeBatchUpdateValue PartitionChangeType = 4
+	PartitionChangeType_PartitionChangeBatchDeleteValue PartitionChangeType = 5
 )
 
 var PartitionChangeType_name = map[int32]string{
 	0: "PartitionChangeInsertValue",
 	1: "PartitionChangeUpdateValue",
 	2: "PartitionChangeDeleteValue",
+	3: "PartitionChangeBatchInsertValue",
+	4: "PartitionChangeBatchUpdateValue",
+	5: "PartitionChangeBatchDeleteValue",
 }
 
 var PartitionChangeType_value = map[string]int32{
-	"PartitionChangeInsertValue": 0,
-	"PartitionChangeUpdateValue": 1,
-	"PartitionChangeDeleteValue": 2,
+	"PartitionChangeInsertValue":      0,
+	"PartitionChangeUpdateValue":      1,
+	"PartitionChangeDeleteValue":      2,
+	"PartitionChangeBatchInsertValue": 3,
+	"PartitionChangeBatchUpdateValue": 4,
+	"PartitionChangeBatchDeleteValue": 5,
 }
 
 func (x PartitionChangeType) String() string {
@@ -290,6 +299,202 @@ func (m *RemoveRequest) GetId() uint64 {
 	return 0
 }
 
+type BatchItem struct {
+	Id                   uint64    `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Value                []float32 `protobuf:"fixed32,2,rep,packed,name=value,proto3" json:"value,omitempty"`
+	Level                int32     `protobuf:"varint,3,opt,name=level,proto3" json:"level,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *BatchItem) Reset()         { *m = BatchItem{} }
+func (m *BatchItem) String() string { return proto.CompactTextString(m) }
+func (*BatchItem) ProtoMessage()    {}
+func (*BatchItem) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f69247dc9b20935f, []int{3}
+}
+
+func (m *BatchItem) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BatchItem.Unmarshal(m, b)
+}
+func (m *BatchItem) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BatchItem.Marshal(b, m, deterministic)
+}
+func (m *BatchItem) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BatchItem.Merge(m, src)
+}
+func (m *BatchItem) XXX_Size() int {
+	return xxx_messageInfo_BatchItem.Size(m)
+}
+func (m *BatchItem) XXX_DiscardUnknown() {
+	xxx_messageInfo_BatchItem.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BatchItem proto.InternalMessageInfo
+
+func (m *BatchItem) GetId() uint64 {
+	if m != nil {
+		return m.Id
+	}
+	return 0
+}
+
+func (m *BatchItem) GetValue() []float32 {
+	if m != nil {
+		return m.Value
+	}
+	return nil
+}
+
+func (m *BatchItem) GetLevel() int32 {
+	if m != nil {
+		return m.Level
+	}
+	return 0
+}
+
+type BatchRequest struct {
+	DatasetId            []byte       `protobuf:"bytes,1,opt,name=dataset_id,json=datasetId,proto3" json:"dataset_id,omitempty"`
+	Items                []*BatchItem `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *BatchRequest) Reset()         { *m = BatchRequest{} }
+func (m *BatchRequest) String() string { return proto.CompactTextString(m) }
+func (*BatchRequest) ProtoMessage()    {}
+func (*BatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f69247dc9b20935f, []int{4}
+}
+
+func (m *BatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BatchRequest.Unmarshal(m, b)
+}
+func (m *BatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BatchRequest.Marshal(b, m, deterministic)
+}
+func (m *BatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BatchRequest.Merge(m, src)
+}
+func (m *BatchRequest) XXX_Size() int {
+	return xxx_messageInfo_BatchRequest.Size(m)
+}
+func (m *BatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_BatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BatchRequest proto.InternalMessageInfo
+
+func (m *BatchRequest) GetDatasetId() []byte {
+	if m != nil {
+		return m.DatasetId
+	}
+	return nil
+}
+
+func (m *BatchRequest) GetItems() []*BatchItem {
+	if m != nil {
+		return m.Items
+	}
+	return nil
+}
+
+type PartitionBatchRequest struct {
+	DatasetId            []byte       `protobuf:"bytes,1,opt,name=dataset_id,json=datasetId,proto3" json:"dataset_id,omitempty"`
+	PartitionId          []byte       `protobuf:"bytes,2,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	Items                []*BatchItem `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *PartitionBatchRequest) Reset()         { *m = PartitionBatchRequest{} }
+func (m *PartitionBatchRequest) String() string { return proto.CompactTextString(m) }
+func (*PartitionBatchRequest) ProtoMessage()    {}
+func (*PartitionBatchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f69247dc9b20935f, []int{5}
+}
+
+func (m *PartitionBatchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PartitionBatchRequest.Unmarshal(m, b)
+}
+func (m *PartitionBatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PartitionBatchRequest.Marshal(b, m, deterministic)
+}
+func (m *PartitionBatchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PartitionBatchRequest.Merge(m, src)
+}
+func (m *PartitionBatchRequest) XXX_Size() int {
+	return xxx_messageInfo_PartitionBatchRequest.Size(m)
+}
+func (m *PartitionBatchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PartitionBatchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PartitionBatchRequest proto.InternalMessageInfo
+
+func (m *PartitionBatchRequest) GetDatasetId() []byte {
+	if m != nil {
+		return m.DatasetId
+	}
+	return nil
+}
+
+func (m *PartitionBatchRequest) GetPartitionId() []byte {
+	if m != nil {
+		return m.PartitionId
+	}
+	return nil
+}
+
+func (m *PartitionBatchRequest) GetItems() []*BatchItem {
+	if m != nil {
+		return m.Items
+	}
+	return nil
+}
+
+type BatchResponse struct {
+	Errors               map[uint64]string `protobuf:"bytes,1,rep,name=errors,proto3" json:"errors,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+}
+
+func (m *BatchResponse) Reset()         { *m = BatchResponse{} }
+func (m *BatchResponse) String() string { return proto.CompactTextString(m) }
+func (*BatchResponse) ProtoMessage()    {}
+func (*BatchResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f69247dc9b20935f, []int{6}
+}
+
+func (m *BatchResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BatchResponse.Unmarshal(m, b)
+}
+func (m *BatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BatchResponse.Marshal(b, m, deterministic)
+}
+func (m *BatchResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BatchResponse.Merge(m, src)
+}
+func (m *BatchResponse) XXX_Size() int {
+	return xxx_messageInfo_BatchResponse.Size(m)
+}
+func (m *BatchResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_BatchResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BatchResponse proto.InternalMessageInfo
+
+func (m *BatchResponse) GetErrors() map[uint64]string {
+	if m != nil {
+		return m.Errors
+	}
+	return nil
+}
+
 type Dataset struct {
 	Id                   []byte       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Dimension            uint32       `protobuf:"varint,2,opt,name=dimension,proto3" json:"dimension,omitempty"`
@@ -306,7 +511,7 @@ func (m *Dataset) Reset()         { *m = Dataset{} }
 func (m *Dataset) String() string { return proto.CompactTextString(m) }
 func (*Dataset) ProtoMessage()    {}
 func (*Dataset) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{3}
+	return fileDescriptor_f69247dc9b20935f, []int{7}
 }
 
 func (m *Dataset) XXX_Unmarshal(b []byte) error {
@@ -381,7 +586,7 @@ func (m *Partition) Reset()         { *m = Partition{} }
 func (m *Partition) String() string { return proto.CompactTextString(m) }
 func (*Partition) ProtoMessage()    {}
 func (*Partition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{4}
+	return fileDescriptor_f69247dc9b20935f, []int{8}
 }
 
 func (m *Partition) XXX_Unmarshal(b []byte) error {
@@ -429,7 +634,7 @@ func (m *DatasetManagerChange) Reset()         { *m = DatasetManagerChange{} }
 func (m *DatasetManagerChange) String() string { return proto.CompactTextString(m) }
 func (*DatasetManagerChange) ProtoMessage()    {}
 func (*DatasetManagerChange) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{5}
+	return fileDescriptor_f69247dc9b20935f, []int{9}
 }
 
 func (m *DatasetManagerChange) XXX_Unmarshal(b []byte) error {
@@ -485,7 +690,7 @@ func (m *DatasetPartitionNodesChange) Reset()         { *m = DatasetPartitionNod
 func (m *DatasetPartitionNodesChange) String() string { return proto.CompactTextString(m) }
 func (*DatasetPartitionNodesChange) ProtoMessage()    {}
 func (*DatasetPartitionNodesChange) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{6}
+	return fileDescriptor_f69247dc9b20935f, []int{10}
 }
 
 func (m *DatasetPartitionNodesChange) XXX_Unmarshal(b []byte) error {
@@ -540,6 +745,7 @@ type PartitionChange struct {
 	Id                   uint64              `protobuf:"varint,3,opt,name=id,proto3" json:"id,omitempty"`
 	Value                []float32           `protobuf:"fixed32,4,rep,packed,name=value,proto3" json:"value,omitempty"`
 	Level                int32               `protobuf:"varint,5,opt,name=level,proto3" json:"level,omitempty"`
+	BatchItems           []*BatchItem        `protobuf:"bytes,6,rep,name=batch_items,json=batchItems,proto3" json:"batch_items,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
@@ -549,7 +755,7 @@ func (m *PartitionChange) Reset()         { *m = PartitionChange{} }
 func (m *PartitionChange) String() string { return proto.CompactTextString(m) }
 func (*PartitionChange) ProtoMessage()    {}
 func (*PartitionChange) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{7}
+	return fileDescriptor_f69247dc9b20935f, []int{11}
 }
 
 func (m *PartitionChange) XXX_Unmarshal(b []byte) error {
@@ -605,6 +811,13 @@ func (m *PartitionChange) GetLevel() int32 {
 	return 0
 }
 
+func (m *PartitionChange) GetBatchItems() []*BatchItem {
+	if m != nil {
+		return m.BatchItems
+	}
+	return nil
+}
+
 type DatasetManagerSnapshot struct {
 	Datasets             []*Dataset `protobuf:"bytes,1,rep,name=datasets,proto3" json:"datasets,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
@@ -616,7 +829,7 @@ func (m *DatasetManagerSnapshot) Reset()         { *m = DatasetManagerSnapshot{}
 func (m *DatasetManagerSnapshot) String() string { return proto.CompactTextString(m) }
 func (*DatasetManagerSnapshot) ProtoMessage()    {}
 func (*DatasetManagerSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f69247dc9b20935f, []int{8}
+	return fileDescriptor_f69247dc9b20935f, []int{12}
 }
 
 func (m *DatasetManagerSnapshot) XXX_Unmarshal(b []byte) error {
@@ -652,6 +865,11 @@ func init() {
 	proto.RegisterType((*InsertRequest)(nil), "anndb_pb.InsertRequest")
 	proto.RegisterType((*UpdateRequest)(nil), "anndb_pb.UpdateRequest")
 	proto.RegisterType((*RemoveRequest)(nil), "anndb_pb.RemoveRequest")
+	proto.RegisterType((*BatchItem)(nil), "anndb_pb.BatchItem")
+	proto.RegisterType((*BatchRequest)(nil), "anndb_pb.BatchRequest")
+	proto.RegisterType((*PartitionBatchRequest)(nil), "anndb_pb.PartitionBatchRequest")
+	proto.RegisterType((*BatchResponse)(nil), "anndb_pb.BatchResponse")
+	proto.RegisterMapType((map[uint64]string)(nil), "anndb_pb.BatchResponse.ErrorsEntry")
 	proto.RegisterType((*Dataset)(nil), "anndb_pb.Dataset")
 	proto.RegisterType((*Partition)(nil), "anndb_pb.Partition")
 	proto.RegisterType((*DatasetManagerChange)(nil), "anndb_pb.DatasetManagerChange")
@@ -665,54 +883,67 @@ func init() {
 }
 
 var fileDescriptor_f69247dc9b20935f = []byte{
-	// 751 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xdd, 0x4e, 0x1b, 0x39,
-	0x14, 0x8e, 0x27, 0x93, 0x40, 0x0e, 0x49, 0x08, 0x86, 0x85, 0x59, 0x76, 0x59, 0xb2, 0x23, 0xb1,
-	0x1b, 0x22, 0x6d, 0x76, 0x09, 0x12, 0xab, 0x5e, 0xb4, 0x52, 0x05, 0x14, 0x45, 0x2a, 0x55, 0x35,
-	0x40, 0x6f, 0x23, 0x13, 0x1b, 0x18, 0x29, 0x78, 0xa6, 0x63, 0x07, 0x89, 0xfb, 0xde, 0xf5, 0x49,
-	0xfa, 0x04, 0xbd, 0xeb, 0xab, 0xf4, 0x01, 0xfa, 0x12, 0x95, 0xed, 0xc9, 0xfc, 0x90, 0x09, 0x95,
-	0x50, 0xef, 0xc6, 0xe7, 0xfb, 0xce, 0xf1, 0xf1, 0xf7, 0x9d, 0xb1, 0xa1, 0x41, 0x89, 0x24, 0x82,
-	0xc9, 0x5e, 0x18, 0x05, 0x32, 0xc0, 0x8b, 0x84, 0x73, 0x7a, 0x39, 0x0c, 0x2f, 0x37, 0x61, 0x14,
-	0x44, 0xcc, 0x44, 0xdd, 0x73, 0x68, 0x0c, 0xb8, 0x60, 0x91, 0xf4, 0xd8, 0xfb, 0x09, 0x13, 0x12,
-	0x6f, 0x01, 0xc4, 0x79, 0x43, 0x9f, 0x3a, 0xa8, 0x8d, 0x3a, 0x75, 0xaf, 0x16, 0x47, 0x06, 0x14,
-	0x37, 0xc1, 0xf2, 0xa9, 0x63, 0xb5, 0x51, 0xc7, 0xf6, 0x2c, 0x9f, 0xe2, 0x35, 0xa8, 0xdc, 0x91,
-	0xf1, 0x84, 0x39, 0xe5, 0x76, 0xb9, 0x63, 0x79, 0x66, 0xa1, 0xaa, 0x5e, 0x84, 0x94, 0x48, 0xf6,
-	0x53, 0xab, 0xbe, 0x80, 0x86, 0xc7, 0x6e, 0x83, 0xbb, 0x27, 0x56, 0x75, 0xbf, 0x21, 0x58, 0x38,
-	0x32, 0x68, 0x8c, 0x99, 0x14, 0xb5, 0xe3, 0xef, 0x50, 0xa3, 0xfe, 0x2d, 0xe3, 0xc2, 0x0f, 0xb8,
-	0x4e, 0x69, 0x78, 0x69, 0x00, 0xef, 0x40, 0x45, 0x84, 0x64, 0xa4, 0xfa, 0x41, 0x9d, 0x66, 0x7f,
-	0xb9, 0x37, 0xd5, 0xb2, 0x77, 0xa6, 0xc2, 0x9e, 0x41, 0xf1, 0xdf, 0xb0, 0x1c, 0x92, 0x48, 0xfa,
-	0xd2, 0x0f, 0xf8, 0x70, 0x14, 0x4c, 0xb8, 0x74, 0x6c, 0x5d, 0xaa, 0x99, 0x84, 0x0f, 0x55, 0x14,
-	0xff, 0x03, 0x38, 0x62, 0xe1, 0xd8, 0x1f, 0x11, 0x4d, 0xbd, 0x22, 0x23, 0x19, 0x44, 0x4e, 0x45,
-	0x73, 0x57, 0x32, 0xc8, 0x2b, 0x0d, 0xe0, 0x7d, 0x80, 0xa4, 0x80, 0x70, 0xaa, 0xed, 0x72, 0x67,
-	0xa9, 0xbf, 0x9a, 0xf6, 0xf0, 0x76, 0x8a, 0x79, 0x19, 0x9a, 0x7b, 0x00, 0xb5, 0x04, 0x98, 0x39,
-	0xee, 0xaf, 0xb0, 0xc8, 0x03, 0xca, 0x86, 0x3e, 0x15, 0x8e, 0xd5, 0x2e, 0x77, 0x6c, 0x6f, 0x41,
-	0xad, 0x07, 0x54, 0xb8, 0x1f, 0x11, 0xac, 0xc5, 0x2a, 0x9d, 0x12, 0x4e, 0xae, 0x59, 0x74, 0x78,
-	0x43, 0xf8, 0x35, 0xc3, 0x07, 0x60, 0xcb, 0xfb, 0x90, 0xe9, 0x2a, 0xcd, 0xbe, 0x9b, 0xee, 0x5f,
-	0xc4, 0x3e, 0xbf, 0x0f, 0x99, 0xa7, 0xf9, 0x4a, 0x15, 0x1e, 0x48, 0xff, 0x6a, 0x7a, 0xda, 0xd8,
-	0x93, 0xba, 0xd7, 0xcc, 0x86, 0x07, 0x14, 0x63, 0xb0, 0x95, 0x79, 0x5a, 0xe4, 0xba, 0xa7, 0xbf,
-	0xdd, 0xcf, 0x08, 0x7e, 0x8b, 0xeb, 0x27, 0xa7, 0x79, 0x13, 0x50, 0x26, 0xe2, 0xa6, 0x9e, 0xe7,
-	0x9a, 0xda, 0x9d, 0x69, 0xaa, 0x28, 0x29, 0xd3, 0x5b, 0x7e, 0x82, 0xac, 0x87, 0x13, 0xf4, 0x27,
-	0xd4, 0x53, 0x43, 0x7d, 0x1a, 0x77, 0xb6, 0x94, 0xc4, 0x06, 0x14, 0x6f, 0xc0, 0x42, 0xac, 0xa4,
-	0xf6, 0xda, 0xf6, 0xaa, 0x46, 0x48, 0xf7, 0x13, 0x82, 0xe5, 0x64, 0xf7, 0xb8, 0xdb, 0xbd, 0x5c,
-	0xb7, 0x5b, 0x05, 0x16, 0x3e, 0x5d, 0x3d, 0x63, 0x71, 0x79, 0xf6, 0x1f, 0xb2, 0x33, 0xff, 0x90,
-	0x8a, 0x8e, 0xd9, 0x1d, 0x1b, 0xeb, 0x61, 0xab, 0x78, 0x66, 0xe1, 0x9e, 0xc0, 0x7a, 0xde, 0xc4,
-	0x33, 0x4e, 0x42, 0x71, 0x13, 0xa8, 0x49, 0x5d, 0x8c, 0xe5, 0x10, 0x0e, 0xd2, 0x83, 0xb7, 0x32,
-	0xa3, 0xb1, 0x97, 0x50, 0xba, 0x7b, 0x50, 0xd1, 0x7f, 0x04, 0x6e, 0x40, 0xed, 0x78, 0x32, 0x1a,
-	0xfb, 0x94, 0x11, 0xde, 0x2a, 0xa9, 0xe5, 0x29, 0xe1, 0x37, 0x44, 0x4a, 0xc2, 0x5b, 0x08, 0x03,
-	0x54, 0x0f, 0x03, 0xe1, 0x73, 0xd6, 0xb2, 0xba, 0x1f, 0x10, 0x38, 0xf3, 0x26, 0x08, 0x6f, 0x27,
-	0xee, 0x4f, 0xb1, 0x88, 0x11, 0xc9, 0xe2, 0x58, 0xab, 0x34, 0x4b, 0x38, 0x62, 0x63, 0x96, 0x12,
-	0x10, 0xfe, 0x0b, 0xdc, 0x3c, 0xc1, 0x5c, 0x4c, 0xf9, 0xb9, 0x68, 0x59, 0x5d, 0x09, 0xdb, 0x3f,
-	0x18, 0x99, 0x4c, 0xa9, 0x22, 0xca, 0x4b, 0x4a, 0xd5, 0xaa, 0x55, 0xc2, 0xbb, 0xb0, 0xf3, 0x08,
-	0xcf, 0x5c, 0x61, 0x9a, 0x8a, 0xba, 0x13, 0x58, 0x2d, 0xb0, 0x1e, 0xff, 0x01, 0x9b, 0x0f, 0xc2,
-	0xe6, 0x92, 0x7e, 0xa7, 0x3c, 0x6c, 0x95, 0x0a, 0x70, 0x73, 0x2a, 0x83, 0xa3, 0x02, 0xdc, 0xc8,
-	0x62, 0x70, 0xab, 0xff, 0x15, 0x41, 0x33, 0xaf, 0x0a, 0xde, 0x07, 0xfb, 0xb5, 0x2f, 0x24, 0x5e,
-	0x4f, 0xed, 0x3d, 0xbe, 0x0d, 0xe5, 0xfd, 0x29, 0x13, 0x82, 0x5c, 0xb3, 0xcd, 0x59, 0xdb, 0xff,
-	0x43, 0xf8, 0x5f, 0x28, 0x9f, 0x30, 0x89, 0x7f, 0x49, 0xb1, 0x8b, 0x8b, 0xc1, 0x51, 0x7c, 0x3d,
-	0x17, 0xa4, 0xe0, 0x1e, 0x54, 0x8d, 0x83, 0x78, 0x16, 0x2c, 0xe2, 0xff, 0x0f, 0x55, 0xd3, 0xf9,
-	0xbc, 0x3d, 0xe6, 0xb4, 0xdb, 0xff, 0x82, 0x60, 0x49, 0x15, 0x99, 0x1e, 0xef, 0x19, 0x54, 0x8d,
-	0x84, 0x78, 0x23, 0xcd, 0xc8, 0xbd, 0x7c, 0xf3, 0x4a, 0xa9, 0x54, 0xa3, 0x6e, 0x36, 0x35, 0xf7,
-	0xbc, 0x3d, 0x96, 0x6a, 0xec, 0xce, 0xa6, 0xe6, 0xde, 0xb0, 0x79, 0xa9, 0x97, 0x55, 0xfd, 0x3e,
-	0xef, 0x7f, 0x0f, 0x00, 0x00, 0xff, 0xff, 0x4c, 0xbf, 0xca, 0xbb, 0xc6, 0x07, 0x00, 0x00,
+	// 954 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0x4f, 0x6f, 0x1b, 0x45,
+	0x14, 0xcf, 0xac, 0xd7, 0x4e, 0xfc, 0xfc, 0x27, 0xee, 0x34, 0x6d, 0x16, 0x43, 0x49, 0xd8, 0xaa,
+	0xe0, 0x44, 0xc2, 0x50, 0x07, 0x15, 0x0a, 0xa2, 0x12, 0x24, 0x21, 0xb2, 0x44, 0x50, 0xb5, 0x6d,
+	0x10, 0x37, 0x6b, 0xec, 0x9d, 0x26, 0x2b, 0xec, 0xd9, 0x65, 0x67, 0x12, 0xc9, 0xf7, 0x4a, 0x1c,
+	0xf8, 0x40, 0x7c, 0x9c, 0x5e, 0xb8, 0x71, 0xe5, 0x03, 0xa0, 0x9d, 0x19, 0xaf, 0x67, 0xb3, 0xbb,
+	0x4d, 0x6b, 0xe5, 0xb6, 0xf3, 0xde, 0xef, 0xf7, 0xfe, 0xbf, 0x9d, 0x81, 0x96, 0x4f, 0x04, 0xe1,
+	0x54, 0xf4, 0xa3, 0x38, 0x14, 0x21, 0xde, 0x20, 0x8c, 0xf9, 0xe3, 0x51, 0x34, 0xee, 0xc2, 0x24,
+	0x8c, 0xa9, 0x92, 0xba, 0x2f, 0xa1, 0x35, 0x64, 0x9c, 0xc6, 0xc2, 0xa3, 0x7f, 0x5c, 0x52, 0x2e,
+	0xf0, 0x03, 0x00, 0xcd, 0x1b, 0x05, 0xbe, 0x83, 0x76, 0x51, 0xaf, 0xe9, 0xd5, 0xb5, 0x64, 0xe8,
+	0xe3, 0x36, 0x58, 0x81, 0xef, 0x58, 0xbb, 0xa8, 0x67, 0x7b, 0x56, 0xe0, 0xe3, 0x2d, 0xa8, 0x5e,
+	0x91, 0xe9, 0x25, 0x75, 0x2a, 0xbb, 0x95, 0x9e, 0xe5, 0xa9, 0x43, 0x62, 0xf5, 0x2c, 0xf2, 0x89,
+	0xa0, 0xb7, 0x6a, 0xf5, 0x19, 0xb4, 0x3c, 0x3a, 0x0b, 0xaf, 0x56, 0xb4, 0xea, 0x9e, 0x40, 0xfd,
+	0x47, 0x22, 0x26, 0x17, 0x43, 0x41, 0x67, 0x5a, 0x89, 0xf2, 0x2e, 0x2d, 0xc3, 0x65, 0x22, 0x9d,
+	0xd2, 0x2b, 0x3a, 0x75, 0x2a, 0xbb, 0xa8, 0x57, 0xf5, 0xd4, 0xc1, 0xfd, 0x0d, 0x9a, 0xd2, 0xd0,
+	0x3b, 0xc6, 0xb1, 0x07, 0xd5, 0x40, 0xd0, 0x19, 0x97, 0xa6, 0x1b, 0x83, 0xbb, 0xfd, 0x45, 0x27,
+	0xfa, 0x69, 0x38, 0x9e, 0x42, 0xb8, 0xaf, 0x11, 0xdc, 0x7b, 0x4e, 0x62, 0x11, 0x88, 0x20, 0x64,
+	0xef, 0xe3, 0xe3, 0x13, 0x68, 0x46, 0x0b, 0xde, 0x48, 0x67, 0xdd, 0xf4, 0x1a, 0xa9, 0xcc, 0x0c,
+	0xa3, 0x72, 0x63, 0x18, 0x7f, 0x22, 0x68, 0x69, 0xef, 0x3c, 0x0a, 0x19, 0xa7, 0xf8, 0x3b, 0xa8,
+	0xd1, 0x38, 0x0e, 0x63, 0xee, 0x20, 0xc9, 0x7e, 0x78, 0x8d, 0xbd, 0x00, 0xf6, 0x8f, 0x25, 0xea,
+	0x98, 0x89, 0x78, 0xee, 0x69, 0x4a, 0xf7, 0x29, 0x34, 0x0c, 0x31, 0xee, 0x40, 0xe5, 0x77, 0x3a,
+	0xd7, 0xb5, 0x4f, 0x3e, 0xcd, 0xe2, 0xa3, 0x5e, 0x5d, 0x17, 0xff, 0x5b, 0xeb, 0x1b, 0xe4, 0xfe,
+	0x8b, 0x60, 0xfd, 0x48, 0x65, 0x69, 0xb4, 0xac, 0x29, 0x5b, 0xf6, 0x11, 0xd4, 0xfd, 0x60, 0x46,
+	0x19, 0x0f, 0x42, 0x26, 0x99, 0x2d, 0x6f, 0x29, 0xc0, 0x8f, 0xa0, 0xca, 0x23, 0x32, 0xa1, 0xb2,
+	0x75, 0xed, 0xc1, 0xe6, 0x32, 0xe0, 0x17, 0x89, 0xd8, 0x53, 0x5a, 0xfc, 0x19, 0x6c, 0x2e, 0x0b,
+	0x37, 0x09, 0x2f, 0x99, 0x70, 0x6c, 0x69, 0xaa, 0x9d, 0x8a, 0x0f, 0x13, 0x29, 0xfe, 0x1c, 0x70,
+	0x4c, 0xa3, 0x69, 0x30, 0x21, 0x12, 0xfa, 0x8a, 0x4c, 0x44, 0x18, 0x3b, 0x55, 0x89, 0xbd, 0x63,
+	0x68, 0x7e, 0x92, 0x0a, 0x7c, 0x00, 0x90, 0x1a, 0xe0, 0x4e, 0xed, 0x7a, 0xc9, 0xd3, 0x26, 0x7b,
+	0x06, 0xcc, 0x7d, 0x02, 0xf5, 0x54, 0x91, 0x4b, 0xf7, 0x03, 0xd8, 0x60, 0xa1, 0x4f, 0x47, 0x81,
+	0xaf, 0x26, 0xc9, 0xf6, 0xd6, 0x93, 0xf3, 0xd0, 0xe7, 0xee, 0x5f, 0x08, 0xb6, 0x74, 0x95, 0x4e,
+	0x09, 0x23, 0xe7, 0x34, 0x3e, 0xbc, 0x20, 0xec, 0x9c, 0xe2, 0x27, 0x60, 0x8b, 0x79, 0x44, 0xa5,
+	0x95, 0xf6, 0xc0, 0x5d, 0xfa, 0x2f, 0x42, 0xbf, 0x9c, 0x47, 0xd4, 0x93, 0xf8, 0xa4, 0x2a, 0x2c,
+	0x14, 0xc1, 0xab, 0x45, 0xb6, 0xe9, 0x44, 0xb5, 0x4d, 0xf1, 0xd0, 0xc7, 0x18, 0xec, 0x64, 0x08,
+	0x65, 0x91, 0x9b, 0x9e, 0xfc, 0x76, 0xff, 0x46, 0xf0, 0xa1, 0xb6, 0x9f, 0x66, 0xf3, 0x4b, 0xe8,
+	0x53, 0xae, 0x83, 0xfa, 0x3e, 0x13, 0xd4, 0x5e, 0x2e, 0xa8, 0x22, 0x92, 0x11, 0x5b, 0x76, 0x13,
+	0xac, 0x9b, 0x36, 0xa1, 0x92, 0xdf, 0x84, 0x6d, 0x58, 0xd7, 0x95, 0x94, 0xbd, 0xb6, 0xbd, 0x9a,
+	0x2a, 0xa4, 0xfb, 0x06, 0xc1, 0x66, 0xea, 0x5d, 0x47, 0xfb, 0x38, 0x13, 0xed, 0x83, 0x82, 0x16,
+	0xae, 0x5e, 0x3d, 0xd5, 0xe2, 0x4a, 0xfe, 0x27, 0x64, 0x17, 0xfe, 0x84, 0xaa, 0xc6, 0x4f, 0x08,
+	0x7f, 0x05, 0x8d, 0x71, 0xb2, 0x79, 0x23, 0xb5, 0xd4, 0xb5, 0xf2, 0xa5, 0x86, 0xf1, 0xe2, 0x93,
+	0xbb, 0x27, 0x70, 0x3f, 0xdb, 0xfa, 0x17, 0x8c, 0x44, 0xfc, 0x22, 0x4c, 0xe6, 0x7b, 0x43, 0x17,
+	0x71, 0xb1, 0xe3, 0x77, 0x72, 0x9d, 0xf1, 0x52, 0xc8, 0xfe, 0x63, 0xa8, 0xca, 0x3d, 0xc2, 0x2d,
+	0xa8, 0x1f, 0x5f, 0x4e, 0xa6, 0x81, 0x4f, 0x09, 0xeb, 0xac, 0x25, 0xc7, 0x53, 0xc2, 0x2e, 0x88,
+	0x10, 0x84, 0x75, 0x10, 0x06, 0xa8, 0x1d, 0x86, 0x3c, 0x60, 0xb4, 0x63, 0xed, 0xbf, 0x46, 0xe0,
+	0x94, 0xcd, 0x1d, 0xde, 0x49, 0x67, 0x66, 0xa1, 0x8b, 0x29, 0x11, 0x54, 0xcb, 0x3a, 0x6b, 0x79,
+	0xc0, 0x11, 0x9d, 0xd2, 0x25, 0x00, 0xe1, 0x4f, 0xc1, 0xcd, 0x02, 0xd4, 0x15, 0x94, 0x9d, 0xa6,
+	0x8e, 0xb5, 0x2f, 0x60, 0xe7, 0x86, 0x41, 0x33, 0x4c, 0x15, 0x41, 0x7e, 0xf0, 0xfd, 0xe4, 0xd4,
+	0x59, 0xc3, 0x7b, 0xf0, 0xe8, 0x2d, 0x38, 0x75, 0x59, 0x49, 0x28, 0xda, 0xff, 0x07, 0xc1, 0xdd,
+	0x82, 0x89, 0xc1, 0x1f, 0x43, 0xf7, 0x9a, 0x58, 0xdd, 0xc7, 0xbf, 0x26, 0xad, 0xef, 0xac, 0x15,
+	0xe8, 0x55, 0x5a, 0x4a, 0x8f, 0x0a, 0xf4, 0xaa, 0x2e, 0x4a, 0x6f, 0xe1, 0x87, 0xb0, 0x73, 0x4d,
+	0xaf, 0x06, 0xc3, 0x70, 0x52, 0x29, 0x03, 0x99, 0x9e, 0xec, 0x32, 0x90, 0xe9, 0xae, 0x3a, 0x78,
+	0x83, 0xa0, 0x9d, 0xed, 0x02, 0x3e, 0x00, 0xfb, 0xe7, 0x80, 0x0b, 0x7c, 0x7f, 0x39, 0x4e, 0xc7,
+	0xb3, 0x48, 0xcc, 0x4f, 0x29, 0xe7, 0xe4, 0x9c, 0x76, 0xf3, 0x63, 0xf6, 0x25, 0xc2, 0x5f, 0x40,
+	0xe5, 0x84, 0x0a, 0x7c, 0x6f, 0xa9, 0x3b, 0x3b, 0x1b, 0x1e, 0xe9, 0xcb, 0xb0, 0x80, 0x82, 0xfb,
+	0x50, 0x53, 0x13, 0x83, 0xf3, 0xca, 0x22, 0xfc, 0xd7, 0x50, 0x53, 0x91, 0x97, 0xf9, 0x28, 0x09,
+	0x77, 0xf0, 0x9f, 0x0d, 0x8d, 0xc4, 0xc8, 0x22, 0xbd, 0xa7, 0x50, 0x53, 0xc5, 0xc4, 0xdb, 0x4b,
+	0x46, 0xe6, 0x4d, 0x55, 0x66, 0x2a, 0xa1, 0xaa, 0x12, 0x9b, 0xd4, 0xcc, 0xc3, 0xe9, 0x6d, 0x54,
+	0x35, 0x5e, 0x26, 0x35, 0xf3, 0x3a, 0x2a, 0xa5, 0x3e, 0x83, 0x86, 0x31, 0x02, 0x66, 0x5b, 0xcc,
+	0x07, 0x47, 0x77, 0xbb, 0xe4, 0x86, 0x4f, 0xf9, 0x3a, 0xf4, 0x95, 0xf9, 0x3a, 0xfe, 0xf7, 0xe6,
+	0x3f, 0x87, 0xad, 0xec, 0x13, 0x49, 0x27, 0xb2, 0x53, 0xf0, 0x6b, 0x5e, 0xd1, 0xa2, 0x4e, 0xed,
+	0x16, 0x2d, 0xea, 0x64, 0x57, 0xb6, 0x38, 0xae, 0xc9, 0xf7, 0xfa, 0xc1, 0xff, 0x01, 0x00, 0x00,
+	0xff, 0xff, 0xb9, 0x1a, 0x33, 0x05, 0xd6, 0x0b, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -938,6 +1169,12 @@ type DataManagerClient interface {
 	Insert(ctx context.Context, in *InsertRequest, opts ...grpc.CallOption) (*EmptyMessage, error)
 	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*EmptyMessage, error)
 	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*EmptyMessage, error)
+	BatchInsert(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
+	BatchUpdate(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
+	BatchRemove(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
+	PartitionBatchInsert(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
+	PartitionBatchUpdate(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
+	PartitionBatchRemove(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error)
 }
 
 type dataManagerClient struct {
@@ -975,11 +1212,71 @@ func (c *dataManagerClient) Remove(ctx context.Context, in *RemoveRequest, opts 
 	return out, nil
 }
 
+func (c *dataManagerClient) BatchInsert(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/BatchInsert", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataManagerClient) BatchUpdate(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/BatchUpdate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataManagerClient) BatchRemove(ctx context.Context, in *BatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/BatchRemove", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataManagerClient) PartitionBatchInsert(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/PartitionBatchInsert", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataManagerClient) PartitionBatchUpdate(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/PartitionBatchUpdate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataManagerClient) PartitionBatchRemove(ctx context.Context, in *PartitionBatchRequest, opts ...grpc.CallOption) (*BatchResponse, error) {
+	out := new(BatchResponse)
+	err := c.cc.Invoke(ctx, "/anndb_pb.DataManager/PartitionBatchRemove", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataManagerServer is the server API for DataManager service.
 type DataManagerServer interface {
 	Insert(context.Context, *InsertRequest) (*EmptyMessage, error)
 	Update(context.Context, *UpdateRequest) (*EmptyMessage, error)
 	Remove(context.Context, *RemoveRequest) (*EmptyMessage, error)
+	BatchInsert(context.Context, *BatchRequest) (*BatchResponse, error)
+	BatchUpdate(context.Context, *BatchRequest) (*BatchResponse, error)
+	BatchRemove(context.Context, *BatchRequest) (*BatchResponse, error)
+	PartitionBatchInsert(context.Context, *PartitionBatchRequest) (*BatchResponse, error)
+	PartitionBatchUpdate(context.Context, *PartitionBatchRequest) (*BatchResponse, error)
+	PartitionBatchRemove(context.Context, *PartitionBatchRequest) (*BatchResponse, error)
 }
 
 // UnimplementedDataManagerServer can be embedded to have forward compatible implementations.
@@ -994,6 +1291,24 @@ func (*UnimplementedDataManagerServer) Update(ctx context.Context, req *UpdateRe
 }
 func (*UnimplementedDataManagerServer) Remove(ctx context.Context, req *RemoveRequest) (*EmptyMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (*UnimplementedDataManagerServer) BatchInsert(ctx context.Context, req *BatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchInsert not implemented")
+}
+func (*UnimplementedDataManagerServer) BatchUpdate(ctx context.Context, req *BatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchUpdate not implemented")
+}
+func (*UnimplementedDataManagerServer) BatchRemove(ctx context.Context, req *BatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchRemove not implemented")
+}
+func (*UnimplementedDataManagerServer) PartitionBatchInsert(ctx context.Context, req *PartitionBatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PartitionBatchInsert not implemented")
+}
+func (*UnimplementedDataManagerServer) PartitionBatchUpdate(ctx context.Context, req *PartitionBatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PartitionBatchUpdate not implemented")
+}
+func (*UnimplementedDataManagerServer) PartitionBatchRemove(ctx context.Context, req *PartitionBatchRequest) (*BatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PartitionBatchRemove not implemented")
 }
 
 func RegisterDataManagerServer(s *grpc.Server, srv DataManagerServer) {
@@ -1054,6 +1369,114 @@ func _DataManager_Remove_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataManager_BatchInsert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).BatchInsert(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/BatchInsert",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).BatchInsert(ctx, req.(*BatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataManager_BatchUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).BatchUpdate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/BatchUpdate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).BatchUpdate(ctx, req.(*BatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataManager_BatchRemove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).BatchRemove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/BatchRemove",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).BatchRemove(ctx, req.(*BatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataManager_PartitionBatchInsert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PartitionBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).PartitionBatchInsert(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/PartitionBatchInsert",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).PartitionBatchInsert(ctx, req.(*PartitionBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataManager_PartitionBatchUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PartitionBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).PartitionBatchUpdate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/PartitionBatchUpdate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).PartitionBatchUpdate(ctx, req.(*PartitionBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataManager_PartitionBatchRemove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PartitionBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataManagerServer).PartitionBatchRemove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/anndb_pb.DataManager/PartitionBatchRemove",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataManagerServer).PartitionBatchRemove(ctx, req.(*PartitionBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _DataManager_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "anndb_pb.DataManager",
 	HandlerType: (*DataManagerServer)(nil),
@@ -1069,6 +1492,30 @@ var _DataManager_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Remove",
 			Handler:    _DataManager_Remove_Handler,
+		},
+		{
+			MethodName: "BatchInsert",
+			Handler:    _DataManager_BatchInsert_Handler,
+		},
+		{
+			MethodName: "BatchUpdate",
+			Handler:    _DataManager_BatchUpdate_Handler,
+		},
+		{
+			MethodName: "BatchRemove",
+			Handler:    _DataManager_BatchRemove_Handler,
+		},
+		{
+			MethodName: "PartitionBatchInsert",
+			Handler:    _DataManager_PartitionBatchInsert_Handler,
+		},
+		{
+			MethodName: "PartitionBatchUpdate",
+			Handler:    _DataManager_PartitionBatchUpdate_Handler,
+		},
+		{
+			MethodName: "PartitionBatchRemove",
+			Handler:    _DataManager_PartitionBatchRemove_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
