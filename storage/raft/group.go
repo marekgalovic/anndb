@@ -22,6 +22,14 @@ var (
 	SnapshotFnAlreadyRegisteredErr error = errors.New("SnapshotFn already registered")
 )
 
+type Group interface {
+	RegisterProcessFn(ProcessFn) error
+	RegisterProcessSnapshotFn(ProcessFn) error
+	RegisterSnapshotFn(SnapshotFn) error
+	LeaderId() uint64
+	Propose(context.Context, []byte) error
+}
+
 type ProcessFn func([]byte) error
 type SnapshotFn func() ([]byte, error)
 
