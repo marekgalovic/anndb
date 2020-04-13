@@ -85,7 +85,7 @@ func (this *Dataset) Meta() *pb.Dataset {
 	return this.meta
 }
 
-func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector) error {
+func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
 	if err := this.checkDimension(&value); err != nil {
 		return err
 	}
@@ -101,14 +101,15 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector) e
 			DatasetId: this.id.Bytes(),
 			Id: id,
 			Value: value,
+			Metadata: metadata,
 		})
 		return err
 	}
 
-	return partition.insert(ctx, id, value)
+	return partition.insert(ctx, id, value, metadata)
 }
 
-func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector) error {
+func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
 	if err := this.checkDimension(&value); err != nil {
 		return err
 	}
@@ -124,11 +125,12 @@ func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector) e
 			DatasetId: this.id.Bytes(),
 			Id: id,
 			Value: value,
+			Metadata: metadata,
 		})
 		return err
 	}
 
-	return partition.update(ctx, id, value)
+	return partition.update(ctx, id, value, metadata)
 }
 
 func (this *Dataset) Remove(ctx context.Context, id uint64) error {
@@ -425,6 +427,7 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 
 		result = append(result, index.SearchResultItem {
 			Id: item.GetId(),
+			Metadata: item.GetMetadata(),
 			Score: item.GetScore(),
 		})
 	}

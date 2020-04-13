@@ -56,7 +56,7 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 		s = space.NewCosine()
 	}
 
-	return index.NewHnsw(uint(dataset.GetDimension()), s, nil) 
+	return index.NewHnsw(uint(dataset.GetDimension()), s) 
 }
 
 func newPartition(id uuid.UUID, meta *pb.Partition, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, datasetManager *DatasetManager) *partition {
@@ -129,7 +129,7 @@ func (this *partition) unloadRaft() error {
 	return nil
 }
 
-func (this *partition) insert(ctx context.Context, id uint64, value math.Vector) error {
+func (this *partition) insert(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -140,6 +140,7 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 		Type: pb.PartitionChangeType_PartitionChangeInsertValue,
 		Id: id,
 		Value: value,
+		Metadata: metadata,
 		Level: int32(this.index.RandomLevel()),
 	}
 
@@ -153,7 +154,7 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector)
 	return nil
 }
 
-func (this *partition) update(ctx context.Context, id uint64, value math.Vector) error {
+func (this *partition) update(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -164,6 +165,7 @@ func (this *partition) update(ctx context.Context, id uint64, value math.Vector)
 		Type: pb.PartitionChangeType_PartitionChangeUpdateValue,
 		Id: id,
 		Value: value,
+		Metadata: metadata,
 	}
 
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
@@ -326,13 +328,13 @@ func (this *partition) proposeAndWaitForCommit(ctx context.Context, proposal *pb
 	}
 }
 
-func (this *partition) insertValue(notificationId uuid.UUID, id uint64, value []float32, level int) error {
-	err := this.index.Insert(id, value, nil, level);
+func (this *partition) insertValue(notificationId uuid.UUID, id uint64, value math.Vector, metadata index.Metadata, level int) error {
+	err := this.index.Insert(id, value, metadata, level);
 	this.notificator.Notify(notificationId, err)
 	return nil
 }
 
-func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value []float32) error {
+func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value math.Vector, metadata index.Metadata) error {
 	vertex, err := this.index.GetVertex(id)
 	if err != nil {
 		this.notificator.Notify(notificationId, err)
@@ -342,7 +344,12 @@ func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value []
 		this.notificator.Notify(notificationId, err)
 		return nil
 	}
-	err = this.index.Insert(id, value, nil, vertex.Level())
+	for k, v := range vertex.Metadata() {
+		if _, exists := metadata[k]; !exists {
+			metadata[k] = v
+		}
+	}
+	err = this.index.Insert(id, value, metadata, vertex.Level())
 	this.notificator.Notify(notificationId, err)
 	return nil
 }
@@ -356,7 +363,7 @@ func (this *partition) deleteValue(notificationId uuid.UUID, id uint64) error {
 func (this *partition) batchInsertValue(notificationId uuid.UUID, items []*pb.BatchItem) error {
 	errors := make(partitionBatchResult)
 	for _, item := range items {
-		if err := this.index.Insert(item.GetId(), item.GetValue(), nil, int(item.GetLevel())); err != nil {
+		if err := this.index.Insert(item.GetId(), item.GetValue(), item.GetMetadata(), int(item.GetLevel())); err != nil {
 			errors[item.GetId()] = err
 		}
 	}
@@ -376,7 +383,13 @@ func (this *partition) batchUpdateValue(notificationId uuid.UUID, items []*pb.Ba
 			errors[item.GetId()] = err
 			continue
 		}
-		if err := this.index.Insert(item.GetId(), item.GetValue(), nil, vertex.Level()); err != nil {
+		metadata := item.GetMetadata()
+		for k, v := range vertex.Metadata() {
+			if _, exists := metadata[k]; !exists {
+				metadata[k] = v
+			}
+		}
+		if err := this.index.Insert(item.GetId(), item.GetValue(), metadata, vertex.Level()); err != nil {
 			errors[item.GetId()] = err
 		}
 	}
@@ -408,9 +421,9 @@ func (this *partition) process(data []byte) error {
 
 	switch change.Type {
 	case pb.PartitionChangeType_PartitionChangeInsertValue:
-		return this.insertValue(notificationId, change.GetId(), change.GetValue(), int(change.GetLevel()))
+		return this.insertValue(notificationId, change.GetId(), change.GetValue(), change.GetMetadata(), int(change.GetLevel()))
 	case pb.PartitionChangeType_PartitionChangeUpdateValue:
-		return this.updateValue(notificationId, change.GetId(), change.GetValue())
+		return this.updateValue(notificationId, change.GetId(), change.GetValue(), change.GetMetadata())
 	case pb.PartitionChangeType_PartitionChangeDeleteValue:
 		return this.deleteValue(notificationId, change.GetId())
 	case pb.PartitionChangeType_PartitionChangeBatchInsertValue:

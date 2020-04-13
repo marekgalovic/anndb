@@ -21,5 +21,6 @@ message SearchPartitionsRequest {
 
 message SearchResultItem {
 	uint64 id = 1;
-	float score = 2;
+	map<string,string> metadata = 2;
+	float score = 3;
 }

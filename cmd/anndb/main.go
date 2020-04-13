@@ -87,6 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer listener.Close()
 
 	grpcServerOptions := make([]grpc.ServerOption, 0)
 	if tlsCertFile != "" && tlsKeyFile != "" {
@@ -115,7 +116,6 @@ func main() {
 	// Shutdown
 	<- utils.InterruptSignal()
 	grpcServer.GracefulStop()
-	listener.Close()
 	log.Info("Shutdown")
 }
 

@@ -4,6 +4,7 @@ type SearchResult []SearchResultItem
 
 type SearchResultItem struct {
 	Id uint64
+	Metadata Metadata
 	Score float32
 }
 

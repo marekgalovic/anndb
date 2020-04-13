@@ -26,12 +26,14 @@ message InsertRequest {
 	bytes dataset_id = 1;
 	uint64 id = 2;
 	repeated float value = 3;
+	map<string,string> metadata = 4;
 }
 
 message UpdateRequest {
 	bytes dataset_id = 1;
 	uint64 id = 2;
 	repeated float value = 3;
+	map<string,string> metadata = 4;
 }
 
 message RemoveRequest {
@@ -42,7 +44,8 @@ message RemoveRequest {
 message BatchItem {
 	uint64 id = 1;
 	repeated float value = 2;
-	int32 level = 3;
+	map<string,string> metadata = 3;
+	int32 level = 4;
 }
 
 message BatchRequest {
@@ -118,8 +121,9 @@ message PartitionChange {
 	bytes notification_id = 2;
 	uint64 id = 3;
 	repeated float value = 4;
-	int32 level = 5;
-	repeated BatchItem batch_items = 6;
+	map<string,string> metadata = 5;
+	int32 level = 6;
+	repeated BatchItem batch_items = 7;
 }
 
 message DatasetManagerSnapshot {

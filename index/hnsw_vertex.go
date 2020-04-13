@@ -39,6 +39,10 @@ func (this *hnswVertex) Vector() math.Vector {
     return this.vector
 }
 
+func (this *hnswVertex) Metadata() Metadata {
+    return this.metadata
+}
+
 func (this *hnswVertex) Level() int {
     return this.level
 }

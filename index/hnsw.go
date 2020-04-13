@@ -24,7 +24,6 @@ type Hnsw struct {
     size uint
     space space.Space
 	config *hnswConfig
-    metadataSchema MetadataSchema
 
     len uint64
     vertices [VERTICES_MAP_SHARD_COUNT]map[uint64]*hnswVertex
@@ -33,12 +32,11 @@ type Hnsw struct {
     entrypoint unsafe.Pointer
 }
 
-func NewHnsw(size uint, space space.Space, metadataSchema MetadataSchema, options ...HnswOption) *Hnsw {
+func NewHnsw(size uint, space space.Space, options ...HnswOption) *Hnsw {
 	index := &Hnsw {
         size: size,
         space: space,
 		config: newHnswConfig(options),
-        metadataSchema: metadataSchema,
 
         len: 0,
         entrypoint: nil,
@@ -211,7 +209,8 @@ func (this *Hnsw) Search(ctx context.Context, query math.Vector, k uint) (Search
     result := make(SearchResult, n)
     for i := n-1; i >= 0; i-- {
         item := neighbors.Pop()
-        result[i].Id = item.Value().(*hnswVertex).id
+        result[i].Id = item.Value().(*hnswVertex).Id()
+        result[i].Metadata = item.Value().(*hnswVertex).Metadata()
         result[i].Score = item.Priority()
     }
 	

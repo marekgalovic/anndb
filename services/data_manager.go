@@ -30,7 +30,7 @@ func (this *dataManagerServer) Insert(ctx context.Context, req *pb.InsertRequest
 		return nil, err
 	}
 
-	if err := dataset.Insert(ctx, req.GetId(), req.GetValue()); err != nil {
+	if err := dataset.Insert(ctx, req.GetId(), req.GetValue(), req.GetMetadata()); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +47,7 @@ func (this *dataManagerServer) Update(ctx context.Context, req *pb.UpdateRequest
 		return nil, err
 	}
 
-	if err := dataset.Update(ctx, req.GetId(), req.GetValue()); err != nil {
+	if err := dataset.Update(ctx, req.GetId(), req.GetValue(), req.GetMetadata()); err != nil {
 		return nil, err
 	}
 
