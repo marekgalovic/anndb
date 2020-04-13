@@ -1,6 +1,7 @@
 package index
 
 import (
+    "fmt";
     "testing";
 	"errors";
     "bytes";
@@ -39,6 +40,14 @@ func hnswIsSame(a, b *Hnsw) error {
             		return errors.New("Other vector value does not match")
             	}
             }
+            if len(vertex.metadata) != len(otherVertex.metadata) {
+                return errors.New("Metadata size does not match")
+            }
+            for k, v := range vertex.metadata {
+                if otherVertex.metadata[k] != v {
+                    return errors.New("Metadata value missmatch")
+                }
+            }
             for l := vertex.level; l >= 0; l-- {
                 neighborDistances := make(map[uint64]float32)
                 otherNeighborDistances := make(map[uint64]float32)
@@ -71,13 +80,13 @@ func hnswIsSame(a, b *Hnsw) error {
 }
 
 func generateRandomIndex(dim, size int, space space.Space) *Hnsw {
-    index := NewHnsw(uint(dim), space, nil)
+    index := NewHnsw(uint(dim), space)
     delOffset := int(size / 10)
     for i := 0; i < size; i++ {
         if i > delOffset && (math.RandomUniform() <= 0.2) {
             index.Remove(uint64(rand.Intn(i-delOffset)))
         } else {
-            index.Insert(uint64(i), math.RandomUniformVector(dim), nil, index.RandomLevel())
+            index.Insert(uint64(i), math.RandomUniformVector(dim), Metadata{"foo": fmt.Sprintf("bar: %d", i)}, index.RandomLevel())
         }
     }
     return index
@@ -93,7 +102,7 @@ func TestHnswSaveAndLoad(t *testing.T) {
         return
     }
 
-    otherIndex := NewHnsw(128, space.NewEuclidean(), nil)
+    otherIndex := NewHnsw(128, space.NewEuclidean())
     err = otherIndex.Load(&buf, true)
     assert.Nil(t, err)
     if err != nil {

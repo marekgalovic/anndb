@@ -177,7 +177,7 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 				return err
 			}
 
-			var metadata Metadata
+			metadata := make(Metadata)
 			if err := metadata.load(r); err != nil {
 				return err
 			}
