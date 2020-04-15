@@ -20,5 +20,10 @@ run_clean:
 	mkdir -p ./data/${ID}
 	go run cmd/anndb/main.go --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"
 
+run_clean_no_join:
+	rm -rf ./data/${ID}
+	mkdir -p ./data/${ID}
+	go run cmd/anndb/main.go --port="600${ID}" --join="false" --data-dir="./data/${ID}"
+
 run:
 	go run cmd/anndb/main.go --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"

@@ -107,7 +107,7 @@ func main() {
 	go grpcServer.Serve(listener)
 
 	// Join cluster
-	if len(joinNodesRaw) > 0 {
+	if (len(joinNodesRaw) > 0) && (joinNodesRaw != "false") {
 		if err := nodesManager.Join(context.Background(), strings.Split(joinNodesRaw, ",")); err != nil {
 			log.Fatal(err)
 		}

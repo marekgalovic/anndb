@@ -5,6 +5,9 @@ import (
 	"os";
 	"fmt";
 	"context";
+	"net";
+	"strconv";
+	"errors";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 
@@ -44,7 +47,7 @@ func ListNodes(c *cli.Context) error {
 		}
 
 		table.Append([]string{
-			fmt.Sprintf("%d", node.GetId()),
+			fmt.Sprintf("%16x", node.GetId()),
 			node.GetAddress(),
 		})
 	}
@@ -54,9 +57,48 @@ func ListNodes(c *cli.Context) error {
 }
 
 func AddNode(c *cli.Context) error {
-	return nil
+	idRaw := c.String("node-id")
+	address := c.String("node-address")
+	port := c.String("node-port")
+
+	if idRaw == "" {
+		return errors.New("Must provide node id")
+	}
+	if address == "" {
+		return errors.New("Must provide node address")
+	}
+	if port == "" {
+		return errors.New("Must provide node port")
+	}
+	id, err := strconv.ParseUint(idRaw, 16, 64)
+	if err != nil {
+		return err
+	}
+
+	client, err := getNodesManagerClient(c)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.AddNode(context.Background(), &pb.Node{Id: id, Address: net.JoinHostPort(address, port)})
+	return err
 }
 
 func RemoveNode(c *cli.Context) error {
-	return nil
+	if c.NArg() == 0 {
+		return errors.New("No node id provided")
+	}
+
+	nodeId, err := strconv.ParseUint(c.Args().Get(0), 16, 64)
+	if err != nil {
+		return err
+	}
+
+	client, err := getNodesManagerClient(c)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.RemoveNode(context.Background(), &pb.Node{Id: nodeId})
+	return err
 }

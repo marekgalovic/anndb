@@ -29,6 +29,11 @@ func main() {
 					{
 						Name: "add",
 						Usage: "Add new node to the cluster",
+						Flags: []cli.Flag {
+							&cli.StringFlag{Name: "node-id"},
+							&cli.StringFlag{Name: "node-address"},
+							&cli.StringFlag{Name: "node-port"},
+						},
 						Action: commands.AddNode,
 					},
 					{

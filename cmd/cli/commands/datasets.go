@@ -4,7 +4,9 @@ import (
 	"io";
 	"os";
 	"fmt";
+	"strings";
 	"context";
+	"errors";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 
@@ -58,5 +60,38 @@ func ListDatasets(c *cli.Context) error {
 }
 
 func GetDataset(c *cli.Context) error {
+	if c.NArg() == 0 {
+		return errors.New("No dataset id provided")
+	}
+	id, err := uuid.FromString(c.Args().Get(0))
+	if err != nil {
+		return err
+	}
+
+	client, err := getDatasetManagerClient(c)
+	if err != nil {
+		return err
+	}
+
+	dataset, err := client.Get(context.Background(), &pb.UUIDRequest{Id: id.Bytes()})
+	if err != nil {
+		return err
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"partition id", "node ids"})
+
+	for _, partition := range dataset.GetPartitions() {
+		nodes := make([]string, len(partition.GetNodeIds()))
+		for i, id := range partition.GetNodeIds() {
+			nodes[i] = fmt.Sprintf("%d", id)
+		}
+		table.Append([]string {
+			fmt.Sprintf("%s", uuid.Must(uuid.FromBytes(partition.GetId()))),
+			strings.Join(nodes, ","),
+		})
+	}
+
+	table.Render()
 	return nil
 }
