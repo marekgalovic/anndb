@@ -81,7 +81,7 @@ func (this *DatasetManager) List() []*pb.Dataset {
 		i++
 	}
 
-	return nil
+	return result
 }
 
 func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {

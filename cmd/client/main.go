@@ -78,49 +78,49 @@ func main() {
 
 	sentAt = time.Now()
 	n := 1000
-	for i := 0; i < n; i++ {
+	for i := 0; i < n / 100; i++ {
 		RETRY:
-		// batchItems := make([]*pb.BatchItem, 100)
-		// for j := 0; j < 100; j++ {
-		// 	batchItems[j] = &pb.BatchItem {
-		// 		Id: uint64(i * 100 + j),
-		// 		Value: math.RandomUniformVector(32),
-		// 		Metadata: map[string]string {
-		// 			"foo": fmt.Sprintf("foo bar baz %d", i * 100 + j),
-		// 		},
-		// 	}
-		// }
+		batchItems := make([]*pb.BatchItem, 100)
+		for j := 0; j < 100; j++ {
+			batchItems[j] = &pb.BatchItem {
+				Id: uint64(i * 100 + j),
+				Value: math.RandomUniformVector(32),
+				Metadata: map[string]string {
+					"foo": fmt.Sprintf("foo bar baz %d", i * 100 + j),
+				},
+			}
+		}
 
-		// resp, err := dataManager.BatchInsert(context.Background(), &pb.BatchRequest {
-		// 	DatasetId: id.Bytes(),
-		// 	Items: batchItems,
-		// })
-		// if err != nil {
-		// 	log.Error(err)
-		// 	goto RETRY
-		// }
-		// for id, errString := range resp.GetErrors() {
-		// 	log.Errorf("ID: %d, Err: %s", id, errString)
-		// }
-		// if i % 10 == 0 {
-		// 	log.Info(i)
-		// }
-
-		_, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
+		resp, err := dataManager.BatchInsert(context.Background(), &pb.BatchRequest {
 			DatasetId: id.Bytes(),
-			Id: uint64(i),
-			Value: math.RandomUniformVector(32),
-			Metadata: map[string]string {
-				"foo": fmt.Sprintf("foo bar baz %d", i),
-			},
+			Items: batchItems,
 		})
 		if err != nil {
 			log.Error(err)
 			goto RETRY
 		}
-		if i % 1000 == 0 {
+		for id, errString := range resp.GetErrors() {
+			log.Errorf("ID: %d, Err: %s", id, errString)
+		}
+		if i % 10 == 0 {
 			log.Info(i)
 		}
+
+		// _, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
+		// 	DatasetId: id.Bytes(),
+		// 	Id: uint64(i),
+		// 	Value: math.RandomUniformVector(32),
+		// 	Metadata: map[string]string {
+		// 		"foo": fmt.Sprintf("foo bar baz %d", i),
+		// 	},
+		// })
+		// if err != nil {
+		// 	log.Error(err)
+		// 	goto RETRY
+		// }
+		// if i % 1000 == 0 {
+		// 	log.Info(i)
+		// }
 	}
 	log.Infof("Insert %d items: %s, %.2f ops/s", n, time.Since(sentAt), float64(n) / time.Since(sentAt).Seconds())
 
