@@ -96,6 +96,7 @@ func main() {
 			log.Fatal(err)
 		}
 		grpcServerOptions = append(grpcServerOptions, grpc.Creds(creds))
+		log.Info("Using SSL")
 	}
 
 	grpcServer := grpc.NewServer(grpcServerOptions...)

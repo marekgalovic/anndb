@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"fmt";
+	"errors";
 	"io";
 	"context";
 
@@ -26,11 +28,11 @@ func (this *NodesManager) Join(ctx context.Context, addresses []string) error {
 	for i, addr := range addresses {
 		err := this.tryJoin(ctx, addr)
 		if err != nil {
-			if i == len(addresses) - 1 {
+			if i < len(addresses) - 1 {
 				log.Errorf("Join attempt failed. %v", err)
 				continue
 			} else {
-				return err
+				return errors.New(fmt.Sprintf("Failed to join cluster. %v", err))
 			}
 		}
 		break
