@@ -17,7 +17,6 @@ const VERTICES_MAP_SHARD_COUNT int = 16
 var (
     ItemNotFoundError error = errors.New("Item not found")
     ItemAlreadyExistsError error = errors.New("Item already exists")
-    EmptyIndexError error = errors.New("Index is empty")
 )
 
 type Hnsw struct {
@@ -193,7 +192,7 @@ func (this *Hnsw) Remove(id uint64) error {
 func (this *Hnsw) Search(ctx context.Context, query math.Vector, k uint) (SearchResult, error) {
     entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint))
     if entrypoint == nil {
-        return nil, EmptyIndexError
+        return make(SearchResult, 0), nil
     }
 
     minDistance := this.space.Distance(query, entrypoint.vector)
