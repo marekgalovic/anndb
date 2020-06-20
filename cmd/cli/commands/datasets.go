@@ -127,6 +127,27 @@ func CreateDataset(c *cli.Context) error {
 	return nil
 }
 
+func DeleteDataset(c *cli.Context) error {
+	if c.NArg() == 0 {
+		return errors.New("Missing dataset id")
+	}
+
+	id, err := uuid.FromString(c.Args().Get(0))
+	if err != nil {
+		return err
+	}
+
+	client, err := getDatasetManagerClient(c)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Delete(context.Background(), &pb.UUIDRequest {
+		Id: id.Bytes(),
+	})
+	return err
+}
+
 func spaceStringToSpaceProto(raw string) (pb.Space, error) {
 	switch raw {
 	case "euclidean":

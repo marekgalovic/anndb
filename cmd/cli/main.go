@@ -67,6 +67,11 @@ func main() {
 						},
 						Action: commands.CreateDataset,
 					},
+					{
+						Name: "delete",
+						Usage: "Delete dataset",
+						Action: commands.DeleteDataset,
+					},
 				},
 			},
 		},
