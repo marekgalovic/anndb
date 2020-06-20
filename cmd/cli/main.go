@@ -56,6 +56,17 @@ func main() {
 						Usage: "Get dataset",
 						Action: commands.GetDataset,
 					},
+					{
+						Name: "create",
+						Usage: "Create dataset",
+						Flags: []cli.Flag {
+							&cli.UintFlag{Name: "dim"},
+							&cli.StringFlag{Name: "space"},
+							&cli.UintFlag{Name: "partition-count"},
+							&cli.UintFlag{Name: "replication-factor"},
+						},
+						Action: commands.CreateDataset,
+					},
 				},
 			},
 		},

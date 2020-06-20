@@ -84,7 +84,7 @@ func GetDataset(c *cli.Context) error {
 	for _, partition := range dataset.GetPartitions() {
 		nodes := make([]string, len(partition.GetNodeIds()))
 		for i, id := range partition.GetNodeIds() {
-			nodes[i] = fmt.Sprintf("%d", id)
+			nodes[i] = fmt.Sprintf("%16x", id)
 		}
 		table.Append([]string {
 			fmt.Sprintf("%s", uuid.Must(uuid.FromBytes(partition.GetId()))),
@@ -94,4 +94,48 @@ func GetDataset(c *cli.Context) error {
 
 	table.Render()
 	return nil
+}
+
+func CreateDataset(c *cli.Context) error {
+	dim := c.Uint("dim")
+	rawSpace := c.String("space")
+	partitionCount := c.Uint("partition-count")
+	replicationFactor := c.Uint("replication-factor")
+
+	space, err := spaceStringToSpaceProto(rawSpace)
+	if err != nil {
+		return err
+	}
+
+	client, err := getDatasetManagerClient(c)
+	if err != nil {
+		return err
+	}
+
+	dataset, err := client.Create(context.Background(), &pb.Dataset {
+		Dimension: uint32(dim),
+		Space: space,
+		PartitionCount: uint32(partitionCount),
+		ReplicationFactor: uint32(replicationFactor),
+
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Created dataset %s\n", uuid.Must(uuid.FromBytes(dataset.GetId())))
+	return nil
+}
+
+func spaceStringToSpaceProto(raw string) (pb.Space, error) {
+	switch raw {
+	case "euclidean":
+		return pb.Space_Euclidean, nil
+	case "manhattan":
+		return pb.Space_Manhattan, nil
+	case "cosine":
+		return pb.Space_Cosine, nil
+	default:
+		return pb.Space_Euclidean, errors.New("Invalid space")
+	}
 }
