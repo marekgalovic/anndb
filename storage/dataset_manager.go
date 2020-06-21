@@ -70,7 +70,7 @@ func (this *DatasetManager) Close() {
 	}
 }
 
-func (this *DatasetManager) List() []*pb.Dataset {
+func (this *DatasetManager) List(ctx context.Context, withSize bool) ([]*pb.Dataset, error) {
 	this.datasetsMu.RLock()
 	defer this.datasetsMu.RUnlock()
 
@@ -78,10 +78,17 @@ func (this *DatasetManager) List() []*pb.Dataset {
 	result := make([]*pb.Dataset, len(this.datasets))
 	for _, dataset := range this.datasets {
 		result[i] = dataset.Meta()
+		if withSize {
+			size, err := dataset.Len(ctx)
+			if err != nil {
+				return nil, err
+			}
+			result[i].Size = size
+		}
 		i++
 	}
 
-	return result
+	return result, nil
 }
 
 func (this *DatasetManager) Get(id uuid.UUID) (*Dataset, error) {

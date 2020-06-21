@@ -92,6 +92,10 @@ func (this *partition) close() {
 	}
 }
 
+func (this *partition) len() int {
+	return this.index.Len()
+}
+
 func (this *partition) loadRaft(nodeIds []uint64) error {
 	this.raftMu.Lock()
 	defer this.raftMu.Unlock()

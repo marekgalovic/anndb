@@ -4,6 +4,7 @@ import (
 	"errors";
 	"context";
 	"sync";
+	"sync/atomic";
 	"math/rand";
 	"sort";
 	"io";
@@ -23,6 +24,7 @@ const maxBatchRequestSize int = 100
 var (
 	DimensionMissmatchErr error = errors.New("Value dimension does not match dataset dimension")
 	PartitionNotFoundErr error = errors.New("Partition not found")
+	PartitionNotOnNodeErr error = errors.New("Partition is not loaded on the node")
 	BatchRequestTooLargerErr error = errors.New("Batch request too large")
 )
 
@@ -32,6 +34,7 @@ type partitionBatchRequestLocalFn func(*partition, context.Context, []*pb.BatchI
 
 type Dataset struct {
 	id uuid.UUID
+	len int
 	meta *pb.Dataset
 	clusterConn *cluster.Conn
 
@@ -83,6 +86,71 @@ func (this *Dataset) close() {
 
 func (this *Dataset) Meta() *pb.Dataset {
 	return this.meta
+}
+
+func (this *Dataset) Len(ctx context.Context) (uint64, error) {
+	this.partitionsMu.RLock()
+	defer this.partitionsMu.RUnlock()
+
+	var result uint64 = 0
+	wg := &sync.WaitGroup{}
+	errorCh := make(chan error, len(this.partitions))
+	for _, partition := range this.partitions {
+		if partition.isOnNode(this.clusterConn.Id()) {
+			atomic.AddUint64(&result, uint64(partition.len()))
+			errorCh <- nil
+		} else {
+			wg.Add(1)
+			go func(ctx context.Context, wg *sync.WaitGroup, errorCh chan error, result *uint64) {
+				defer wg.Done()
+				client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				resp, err := client.PartitionLen(ctx, &pb.PartitionLenRequest {
+					DatasetId: this.id.Bytes(),
+					PartitionId: partition.id.Bytes(),
+				})
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				atomic.AddUint64(result, resp.GetLen())
+			}(ctx, wg, errorCh, &result)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	for i := 0; i < len(this.partitions); i++ {
+		select {
+		case err := <- errorCh:
+			if err != nil {
+				return 0, err
+			}
+		case <- ctx.Done():
+			return 0, ctx.Err()
+		}
+	}
+
+	return atomic.LoadUint64(&result), nil
+}
+
+func (this *Dataset) PartitionLen(ctx context.Context, partitionId uuid.UUID) (uint64, error) {
+	partition, err := this.getPartition(partitionId)
+	if err != nil {
+		return 0, err
+	}
+
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		return 0, PartitionNotOnNodeErr
+	}
+
+	return uint64(partition.len()), nil
 }
 
 func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {

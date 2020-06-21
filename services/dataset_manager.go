@@ -19,8 +19,11 @@ func NewDatasetManagerServer(manager *storage.DatasetManager) *datasetManagerSer
 	}
 }
 
-func (this *datasetManagerServer) List(req *pb.EmptyMessage, stream pb.DatasetManager_ListServer) error {
-	datasets := this.manager.List()
+func (this *datasetManagerServer) List(req *pb.ListDatasetsRequest, stream pb.DatasetManager_ListServer) error {
+	datasets, err := this.manager.List(stream.Context(), req.GetWithSize())
+	if err != nil {
+		return err
+	}
 
 	for _, dataset := range datasets {
 		if err := stream.Send(dataset); err != nil {
@@ -31,8 +34,8 @@ func (this *datasetManagerServer) List(req *pb.EmptyMessage, stream pb.DatasetMa
 	return nil
 }
 
-func (this *datasetManagerServer) Get(ctx context.Context, req *pb.UUIDRequest) (*pb.Dataset, error) {
-	id, err := uuid.FromBytes(req.GetId())
+func (this *datasetManagerServer) Get(ctx context.Context, req *pb.GetDatasetRequest) (*pb.Dataset, error) {
+	id, err := uuid.FromBytes(req.GetDatasetId())
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +44,16 @@ func (this *datasetManagerServer) Get(ctx context.Context, req *pb.UUIDRequest) 
 	if err != nil {
 		return nil, err
 	}
+	meta := dataset.Meta()
 
-	return dataset.Meta(), nil
+	if req.GetWithSize() {
+		meta.Size, err = dataset.Len(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return meta, nil
 }
 
 func (this *datasetManagerServer) Create(ctx context.Context, req *pb.Dataset) (*pb.Dataset, error) {

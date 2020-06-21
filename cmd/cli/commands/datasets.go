@@ -30,13 +30,13 @@ func ListDatasets(c *cli.Context) error {
 		return err
 	}
 
-	stream, err := client.List(context.Background(), &pb.EmptyMessage{})
+	stream, err := client.List(context.Background(), &pb.ListDatasetsRequest{WithSize: true})
 	if err != nil {
 		return err
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"id", "dimension", "space", "partition count", "replication factor"})
+	table.SetHeader([]string{"id", "size", "dimension", "space", "partition count", "replication factor"})
 
 	for {
 		dataset, err := stream.Recv()
@@ -48,6 +48,7 @@ func ListDatasets(c *cli.Context) error {
 
 		table.Append([]string {
 			fmt.Sprintf("%s", uuid.Must(uuid.FromBytes(dataset.GetId()))),
+			fmt.Sprintf("%d", dataset.GetSize()),
 			fmt.Sprintf("%d", dataset.GetDimension()),
 			fmt.Sprintf("%s", dataset.GetSpace()),
 			fmt.Sprintf("%d", dataset.GetPartitionCount()),
@@ -73,7 +74,7 @@ func GetDataset(c *cli.Context) error {
 		return err
 	}
 
-	dataset, err := client.Get(context.Background(), &pb.UUIDRequest{Id: id.Bytes()})
+	dataset, err := client.Get(context.Background(), &pb.GetDatasetRequest{DatasetId: id.Bytes(), WithSize: false})
 	if err != nil {
 		return err
 	}

@@ -4,8 +4,8 @@ package anndb_pb;
 import "core.proto";
 
 service DatasetManager {
-	rpc List(EmptyMessage) returns (stream Dataset);
-	rpc Get(UUIDRequest) returns (Dataset);
+	rpc List(ListDatasetsRequest) returns (stream Dataset);
+	rpc Get(GetDatasetRequest) returns (Dataset);
 	rpc Create(Dataset) returns (Dataset);
 	rpc Delete(UUIDRequest) returns (EmptyMessage);
 }
@@ -20,6 +20,16 @@ service DataManager {
 	rpc PartitionBatchInsert(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchUpdate(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchRemove(PartitionBatchRequest) returns (BatchResponse);
+	rpc PartitionLen(PartitionLenRequest) returns (PartitionLenResponse);
+}
+
+message ListDatasetsRequest {
+	bool with_size = 1;
+}
+
+message GetDatasetRequest {
+	bytes dataset_id = 1;
+	bool with_size = 2;
 }
 
 message InsertRequest {
@@ -63,6 +73,15 @@ message BatchResponse {
 	map<uint64, string> errors = 1;
 }
 
+message PartitionLenRequest {
+	bytes dataset_id = 1;
+	bytes partition_id = 2;
+}
+
+message PartitionLenResponse {
+	uint64 len = 1;
+}
+
 enum Space {
 	Euclidean = 0;
 	Manhattan = 1;
@@ -76,6 +95,7 @@ message Dataset {
 	uint32 partition_count = 4;
 	uint32 replication_factor = 5;
 	repeated Partition partitions = 6;
+	uint64 size = 7;
 }
 
 message Partition {
