@@ -11,6 +11,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/satori/go.uuid v1.2.0
+	github.com/shirou/gopsutil v2.20.5+incompatible
 	github.com/sirupsen/logrus v1.5.0
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli/v2 v2.2.0

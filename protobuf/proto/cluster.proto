@@ -7,9 +7,22 @@ service NodesManager {
 	rpc ListNodes(EmptyMessage) returns (stream Node);
 	rpc AddNode(Node) returns (stream Node);
 	rpc RemoveNode(Node) returns (EmptyMessage);
+	rpc LoadInfo(EmptyMessage) returns (NodeLoadInfo);
 }
 
 message Node {
 	uint64 id = 1;
 	string address = 2;
+}
+
+message NodeLoadInfo {
+	uint64 uptime = 1;
+	double cpu_load1 = 2;
+	double cpu_load5 = 3;
+	double cpu_load15 = 4;
+	uint64 mem_total = 5;
+	uint64 mem_available = 6;
+	uint64 mem_used = 7;
+	uint64 mem_free = 8;
+	double mem_used_percent = 9;
 }

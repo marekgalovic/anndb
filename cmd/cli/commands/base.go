@@ -14,5 +14,9 @@ func dialNode(c *cli.Context) (*grpc.ClientConn, error) {
 		port = "6001"
 	}
 
-	return grpc.Dial(net.JoinHostPort(host, port), grpc.WithInsecure())
+	return dialNodeByAddr(net.JoinHostPort(host, port))
+}
+
+func dialNodeByAddr(addr string) (*grpc.ClientConn, error) {
+	return grpc.Dial(addr, grpc.WithInsecure())
 }

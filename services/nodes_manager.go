@@ -5,6 +5,10 @@ import (
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 	"github.com/marekgalovic/anndb/storage/raft";
+
+	"github.com/shirou/gopsutil/host";
+	"github.com/shirou/gopsutil/load";
+	"github.com/shirou/gopsutil/mem";
 )
 
 type nodesManagerServer struct {
@@ -47,4 +51,31 @@ func (this *nodesManagerServer) RemoveNode(ctx context.Context, req *pb.Node) (*
 	}
 
 	return &pb.EmptyMessage{}, nil
+}
+
+func (this *nodesManagerServer) LoadInfo(ctx context.Context, req *pb.EmptyMessage) (*pb.NodeLoadInfo, error) {
+	hInfoStat, err := host.InfoWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	vMemStat, err := mem.VirtualMemoryWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	loadAvgStat, err := load.AvgWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.NodeLoadInfo {
+		Uptime: hInfoStat.Uptime,
+		CpuLoad1: loadAvgStat.Load1,
+		CpuLoad5: loadAvgStat.Load5,
+		CpuLoad15: loadAvgStat.Load15,
+		MemTotal: vMemStat.Total,
+		MemAvailable: vMemStat.Available,
+		MemUsed: vMemStat.Used,
+		MemFree: vMemStat.Free,
+		MemUsedPercent: vMemStat.UsedPercent,
+	}, nil
 }

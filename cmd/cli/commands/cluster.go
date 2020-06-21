@@ -8,6 +8,7 @@ import (
 	"net";
 	"strconv";
 	"errors";
+	"time";
 
 	pb "github.com/marekgalovic/anndb/protobuf";
 
@@ -17,6 +18,15 @@ import (
 
 func getNodesManagerClient(c *cli.Context) (pb.NodesManagerClient, error) {
 	conn, err := dialNode(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return pb.NewNodesManagerClient(conn), nil
+}
+
+func getNodesManagerClientForAddr(addr string) (pb.NodesManagerClient, error) {
+	conn, err := dialNodeByAddr(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +46,7 @@ func ListNodes(c *cli.Context) error {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"id", "address"})
+	table.SetHeader([]string{"id", "address", "uptime", "load", "used memory"})
 
 	for {
 		node, err := stream.Recv()
@@ -46,9 +56,21 @@ func ListNodes(c *cli.Context) error {
 			return err
 		}
 
+		nodeClient, err := getNodesManagerClientForAddr(node.GetAddress())
+		if err != nil {
+			return err
+		}
+		loadInfo, err := nodeClient.LoadInfo(context.Background(), &pb.EmptyMessage{})
+		if err != nil {
+			return err
+		}
+
 		table.Append([]string{
 			fmt.Sprintf("%16x", node.GetId()),
 			node.GetAddress(),
+			fmt.Sprintf("%s", time.Duration(loadInfo.GetUptime()) * time.Second),
+			fmt.Sprintf("%.2f%%", loadInfo.GetCpuLoad5()),
+			fmt.Sprintf("%.2f%%", loadInfo.GetMemUsedPercent()),
 		})
 	}
 
