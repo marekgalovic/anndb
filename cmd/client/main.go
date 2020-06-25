@@ -100,7 +100,7 @@ func main() {
 			goto RETRY
 		}
 		for id, errString := range resp.GetErrors() {
-			log.Errorf("ID: %d, Err: %s", id, errString)
+			log.Errorf("ID: %s, Err: %s", id, errString)
 		}
 		if i % 10 == 0 {
 			log.Info(i)
