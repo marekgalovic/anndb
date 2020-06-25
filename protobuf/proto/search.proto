@@ -20,7 +20,7 @@ message SearchPartitionsRequest {
 }
 
 message SearchResultItem {
-	uint64 id = 1;
+	bytes id = 1;
 	map<string,string> metadata = 2;
 	float score = 3;
 }

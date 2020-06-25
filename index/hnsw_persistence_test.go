@@ -6,12 +6,14 @@ import (
 	"errors";
     "bytes";
     "sync/atomic";
-    "math/rand";
+    // "math/rand";
 
     "github.com/marekgalovic/anndb/math";
     "github.com/marekgalovic/anndb/index/space";
 
     "github.com/stretchr/testify/assert";
+
+    "github.com/satori/go.uuid";
 )
 
 func hnswIsSame(a, b *Hnsw) error {
@@ -49,8 +51,8 @@ func hnswIsSame(a, b *Hnsw) error {
                 }
             }
             for l := vertex.level; l >= 0; l-- {
-                neighborDistances := make(map[uint64]float32)
-                otherNeighborDistances := make(map[uint64]float32)
+                neighborDistances := make(map[uuid.UUID]float32)
+                otherNeighborDistances := make(map[uuid.UUID]float32)
                 for neighbor, distance := range vertex.edges[l] {
                 	if atomic.LoadUint32(&neighbor.deleted) == 0 {
                 		neighborDistances[neighbor.id] = distance
@@ -80,13 +82,23 @@ func hnswIsSame(a, b *Hnsw) error {
 }
 
 func generateRandomIndex(dim, size int, space space.Space) *Hnsw {
+    insertKeys := make(map[uuid.UUID]struct{})
+
     index := NewHnsw(uint(dim), space)
     delOffset := int(size / 10)
     for i := 0; i < size; i++ {
         if i > delOffset && (math.RandomUniform() <= 0.2) {
-            index.Remove(uint64(rand.Intn(i-delOffset)))
+            var key uuid.UUID
+            for k := range insertKeys {
+                key = k
+                break
+            }
+            delete(insertKeys, key)
+            index.Remove(key)
         } else {
-            index.Insert(uint64(i), math.RandomUniformVector(dim), Metadata{"foo": fmt.Sprintf("bar: %d", i)}, index.RandomLevel())
+            id := uuid.NewV4()
+            insertKeys[id] = struct{}{}
+            index.Insert(id, math.RandomUniformVector(dim), Metadata{"foo": fmt.Sprintf("bar: %d", i), "id": id.String()}, index.RandomLevel())
         }
     }
     return index

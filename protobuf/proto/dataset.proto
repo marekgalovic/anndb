@@ -34,25 +34,25 @@ message GetDatasetRequest {
 
 message InsertRequest {
 	bytes dataset_id = 1;
-	uint64 id = 2;
+	bytes id = 2;
 	repeated float value = 3;
 	map<string,string> metadata = 4;
 }
 
 message UpdateRequest {
 	bytes dataset_id = 1;
-	uint64 id = 2;
+	bytes id = 2;
 	repeated float value = 3;
 	map<string,string> metadata = 4;
 }
 
 message RemoveRequest {
 	bytes dataset_id = 1;
-	uint64 id = 2;
+	bytes id = 2;
 }
 
 message BatchItem {
-	uint64 id = 1;
+	bytes id = 1;
 	repeated float value = 2;
 	map<string,string> metadata = 3;
 	int32 level = 4;
@@ -70,7 +70,7 @@ message PartitionBatchRequest {
 }
 
 message BatchResponse {
-	map<uint64, string> errors = 1;
+	map<string, string> errors = 1;
 }
 
 message PartitionLenRequest {
@@ -139,7 +139,7 @@ enum PartitionChangeType {
 message PartitionChange {
 	PartitionChangeType type = 1;
 	bytes notification_id = 2;
-	uint64 id = 3;
+	bytes id = 3;
 	repeated float value = 4;
 	map<string,string> metadata = 5;
 	int32 level = 6;

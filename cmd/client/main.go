@@ -83,7 +83,7 @@ func main() {
 		batchItems := make([]*pb.BatchItem, 100)
 		for j := 0; j < 100; j++ {
 			batchItems[j] = &pb.BatchItem {
-				Id: uint64(i * 100 + j),
+				Id: uuid.NewV4().Bytes(),
 				Value: math.RandomUniformVector(32),
 				Metadata: map[string]string {
 					"foo": fmt.Sprintf("foo bar baz %d", i * 100 + j),

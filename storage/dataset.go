@@ -14,6 +14,7 @@ import (
 	"github.com/marekgalovic/anndb/index";
 	"github.com/marekgalovic/anndb/math";
 	"github.com/marekgalovic/anndb/storage/raft";
+	"github.com/marekgalovic/anndb/utils";
 	
 	"github.com/satori/go.uuid";
 	badger "github.com/dgraph-io/badger/v2";
@@ -28,9 +29,9 @@ var (
 	BatchRequestTooLargerErr error = errors.New("Batch request too large")
 )
 
-type partitionBatchResult map[uint64]error
+type partitionBatchResult map[uuid.UUID]error
 type partitionBatchRequestRemoteFn func(pb.DataManagerClient, context.Context, *pb.PartitionBatchRequest) (*pb.BatchResponse, error)
-type partitionBatchRequestLocalFn func(*partition, context.Context, []*pb.BatchItem) (map[uint64]error, error)
+type partitionBatchRequestLocalFn func(*partition, context.Context, []*pb.BatchItem) (map[uuid.UUID]error, error)
 
 type Dataset struct {
 	id uuid.UUID
@@ -153,7 +154,7 @@ func (this *Dataset) PartitionLen(ctx context.Context, partitionId uuid.UUID) (u
 	return uint64(partition.len()), nil
 }
 
-func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
+func (this *Dataset) Insert(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	if err := this.checkDimension(&value); err != nil {
 		return err
 	}
@@ -167,7 +168,7 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector, m
 		}
 		_, err = client.Insert(ctx, &pb.InsertRequest {
 			DatasetId: this.id.Bytes(),
-			Id: id,
+			Id: id.Bytes(),
 			Value: value,
 			Metadata: metadata,
 		})
@@ -177,7 +178,7 @@ func (this *Dataset) Insert(ctx context.Context, id uint64, value math.Vector, m
 	return partition.insert(ctx, id, value, metadata)
 }
 
-func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
+func (this *Dataset) Update(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	if err := this.checkDimension(&value); err != nil {
 		return err
 	}
@@ -191,7 +192,7 @@ func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector, m
 		}
 		_, err = client.Update(ctx, &pb.UpdateRequest {
 			DatasetId: this.id.Bytes(),
-			Id: id,
+			Id: id.Bytes(),
 			Value: value,
 			Metadata: metadata,
 		})
@@ -201,7 +202,7 @@ func (this *Dataset) Update(ctx context.Context, id uint64, value math.Vector, m
 	return partition.update(ctx, id, value, metadata)
 }
 
-func (this *Dataset) Remove(ctx context.Context, id uint64) error {
+func (this *Dataset) Remove(ctx context.Context, id uuid.UUID) error {
 	partition := this.getPartitionForId(id)
 	if !partition.isOnNode(this.clusterConn.Id()) {
 		// Proxy the request to the partition leader
@@ -211,7 +212,7 @@ func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 		}
 		_, err = client.Remove(ctx, &pb.RemoveRequest {
 			DatasetId: this.id.Bytes(),
-			Id: id,
+			Id: id.Bytes(),
 		})
 		return err
 	}
@@ -219,17 +220,17 @@ func (this *Dataset) Remove(ctx context.Context, id uint64) error {
 	return this.getPartitionForId(id).remove(ctx, id)
 }
 
-func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	if len(items) > maxBatchRequestSize {
 		return nil, BatchRequestTooLargerErr
 	}
 
-	errors := make(map[uint64]error)
+	errors := make(map[uuid.UUID]error)
 	var checkedItems []*pb.BatchItem
 	for _, item := range items {
 		value := math.Vector(item.GetValue())
 		if err := this.checkDimension(&value); err != nil {
-			errors[item.GetId()] = err
+			errors[uuid.FromBytesOrNil(item.GetId())] = err
 		} else {
 			checkedItems = append(checkedItems, item)
 		}
@@ -240,7 +241,7 @@ func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (ma
 		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
 			return client.PartitionBatchInsert(ctx, req)
 		},
-		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 			return partition.batchInsert(ctx, items)
 		},
 	)
@@ -253,7 +254,7 @@ func (this *Dataset) BatchInsert(ctx context.Context, items []*pb.BatchItem) (ma
 	return errors, nil
 }
 
-func (this *Dataset) PartitionBatchInsert(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) PartitionBatchInsert(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	partition, err := this.getPartition(partitionId)
 	if err != nil {
 		return nil, err
@@ -262,17 +263,17 @@ func (this *Dataset) PartitionBatchInsert(ctx context.Context, partitionId uuid.
 	return partition.batchInsert(ctx, items)
 }
 
-func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	if len(items) > maxBatchRequestSize {
 		return nil, BatchRequestTooLargerErr
 	}
 
-	errors := make(map[uint64]error)
+	errors := make(map[uuid.UUID]error)
 	var checkedItems []*pb.BatchItem
 	for _, item := range items {
 		value := math.Vector(item.GetValue())
 		if err := this.checkDimension(&value); err != nil {
-			errors[item.GetId()] = err
+			errors[uuid.FromBytesOrNil(item.GetId())] = err
 		} else {
 			checkedItems = append(checkedItems, item)
 		}
@@ -283,7 +284,7 @@ func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (ma
 		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
 			return client.PartitionBatchUpdate(ctx, req)
 		},
-		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 			return partition.batchUpdate(ctx, items)
 		},
 	)
@@ -296,7 +297,7 @@ func (this *Dataset) BatchUpdate(ctx context.Context, items []*pb.BatchItem) (ma
 	return errors, nil
 }
 
-func (this *Dataset) PartitionBatchUpdate(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) PartitionBatchUpdate(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	partition, err := this.getPartition(partitionId)
 	if err != nil {
 		return nil, err
@@ -305,7 +306,7 @@ func (this *Dataset) PartitionBatchUpdate(ctx context.Context, partitionId uuid.
 	return partition.batchUpdate(ctx, items)
 }
 
-func (this *Dataset) BatchRemove(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) BatchRemove(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	if len(items) > maxBatchRequestSize {
 		return nil, BatchRequestTooLargerErr
 	}
@@ -315,13 +316,13 @@ func (this *Dataset) BatchRemove(ctx context.Context, items []*pb.BatchItem) (ma
 		func(client pb.DataManagerClient, ctx context.Context, req *pb.PartitionBatchRequest) (*pb.BatchResponse, error) {
 			return client.PartitionBatchRemove(ctx, req)
 		},
-		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+		func(partition *partition, ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 			return partition.batchRemove(ctx, items)
 		},
 	)
 }
 
-func (this *Dataset) PartitionBatchRemove(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *Dataset) PartitionBatchRemove(ctx context.Context, partitionId uuid.UUID, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	partition, err := this.getPartition(partitionId)
 	if err != nil {
 		return nil, err
@@ -425,11 +426,11 @@ func (this *Dataset) getPartition(id uuid.UUID) (*partition, error) {
 	return nil, PartitionNotFoundErr
 }
 
-func (this *Dataset) getPartitionForId(id uint64) *partition {
+func (this *Dataset) getPartitionForId(id uuid.UUID) *partition {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
 
-	return this.partitions[id % uint64(this.Meta().GetPartitionCount())]
+	return this.partitions[utils.UuidMod(id, uint64(this.Meta().GetPartitionCount()))]
 }
 
 func (this *Dataset) checkDimension(value *math.Vector) error {
@@ -492,9 +493,13 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 			errorCh <- err
 			return
 		}
+		id, err := uuid.FromBytes(item.GetId())
+		if err != nil {
+			errorCh <- err
+		}
 
 		result = append(result, index.SearchResultItem {
-			Id: item.GetId(),
+			Id: id,
 			Metadata: item.GetMetadata(),
 			Score: item.GetScore(),
 		})
@@ -517,7 +522,7 @@ func (this *Dataset) searchPartition(ctx context.Context, partition *partition, 
 func (this *Dataset) groupBatchItemsByPartition(items []*pb.BatchItem) map[*partition][]*pb.BatchItem {
 	result := make(map[*partition][]*pb.BatchItem)
 	for _, item := range items {
-		partition := this.getPartitionForId(item.GetId())
+		partition := this.getPartitionForId(uuid.Must(uuid.FromBytes(item.GetId())))
 		if _, exists := result[partition]; !exists {
 			result[partition] = make([]*pb.BatchItem, 0)
 		}
@@ -526,7 +531,7 @@ func (this *Dataset) groupBatchItemsByPartition(items []*pb.BatchItem) map[*part
 	return result
 }
 
-func (this *Dataset) partitionsBatchRequest(ctx context.Context, items []*pb.BatchItem, remoteFn partitionBatchRequestRemoteFn, localFn partitionBatchRequestLocalFn) (map[uint64]error, error) {
+func (this *Dataset) partitionsBatchRequest(ctx context.Context, items []*pb.BatchItem, remoteFn partitionBatchRequestRemoteFn, localFn partitionBatchRequestLocalFn) (map[uuid.UUID]error, error) {
 	wg := &sync.WaitGroup{}
 	resultCh := make(chan partitionBatchResult)
 
@@ -541,7 +546,7 @@ func (this *Dataset) partitionsBatchRequest(ctx context.Context, items []*pb.Bat
 		close(resultCh)
 	}()
 
-	errors := make(map[uint64]error)
+	errors := make(map[uuid.UUID]error)
 	for i := 0; i < len(partitionItems); i++ {
 		select {
 		case result := <- resultCh:
@@ -591,15 +596,15 @@ func (this *Dataset) handlePartitionBatchRequest(ctx context.Context, partition 
 func (this *Dataset) errorToPartitionBatchResult(items []*pb.BatchItem, err error) partitionBatchResult {
 	result := make(partitionBatchResult)
 	for _, item := range items {
-		result[item.GetId()] = err
+		result[uuid.FromBytesOrNil(item.GetId())] = err
 	}
 	return result
 }
 
-func (this *Dataset) errorsResponseToPartitionBatchResult(errStrings map[uint64]string) partitionBatchResult {
+func (this *Dataset) errorsResponseToPartitionBatchResult(errStrings map[string]string) partitionBatchResult {
 	result := make(partitionBatchResult)
 	for id, errString := range errStrings {
-		result[id] = errors.New(errString)
+		result[uuid.Must(uuid.FromString(id))] = errors.New(errString)
 	}
 	return result
 }

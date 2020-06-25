@@ -9,6 +9,8 @@ import (
 
 	"github.com/marekgalovic/anndb/math";
 	"github.com/marekgalovic/anndb/index/space";
+
+	"github.com/satori/go.uuid";
 )
 
 var (
@@ -62,7 +64,7 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 	if entrypoint == nil {
 		return NoEntrypointErr
 	}
-	if err := binary.Write(w, binary.BigEndian, entrypoint.id); err != nil {
+	if _, err := w.Write(entrypoint.id.Bytes()); err != nil {
 		return err
 	}
 	
@@ -73,7 +75,7 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 		}
 
 		for _, vertex := range verticesShard {
-			if err := binary.Write(w, binary.BigEndian, vertex.id); err != nil {
+			if _, err := w.Write(vertex.id.Bytes()); err != nil {
 				return err
 			}
 			if err := binary.Write(w, binary.BigEndian, int32(vertex.level)); err != nil {
@@ -91,7 +93,7 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 	// Store edges
 	for _, verticesShard := range this.vertices {
 		for _, vertex := range verticesShard {
-			if err := binary.Write(w, binary.BigEndian, vertex.id); err != nil {
+			if _, err := w.Write(vertex.id.Bytes()); err != nil {
 				return err
 			}
 
@@ -109,7 +111,7 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 					if atomic.LoadUint32(&neighbor.deleted) == 1 {
 						continue
 					}
-					if err := binary.Write(w, binary.BigEndian, neighbor.id); err != nil {
+					if _, err := w.Write(neighbor.id.Bytes()); err != nil {
 						return err
 					}
 					if err := binary.Write(w, binary.BigEndian, distance); err != nil {
@@ -143,12 +145,16 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 		this.space = space
 	}
 
-	var id, neighborId, entrypointId uint64
 	var level int32
 	var numEdges uint32
 	var distance float32
 
-	if err := binary.Read(r, binary.BigEndian, &entrypointId); err != nil {
+	uuidBuf := make([]byte, uuid.Size)
+	if _, err := r.Read(uuidBuf); err != nil {
+		return err
+	}
+	entrypointId, err := uuid.FromBytes(uuidBuf)
+	if err != nil {
 		return err
 	}
 
@@ -161,11 +167,15 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 		}
 		this.len += uint64(shardSize)
 
-		this.vertices[i] = make(map[uint64]*hnswVertex, int(shardSize))
+		this.vertices[i] = make(map[uuid.UUID]*hnswVertex, int(shardSize))
 		verticesShard := this.vertices[i]
 
 		for i := 0; i < int(shardSize); i++ {
-			if err := binary.Read(r, binary.BigEndian, &id); err != nil {
+			if _, err := r.Read(uuidBuf); err != nil {
+				return err
+			}
+			id, err := uuid.FromBytes(uuidBuf)
+			if err != nil {
 				return err
 			}
 			if err := binary.Read(r, binary.BigEndian, &level); err != nil {
@@ -194,7 +204,11 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 	var vertex *hnswVertex
 	for _, verticesShard := range this.vertices {
 		for i := 0; i < len(verticesShard); i++ {
-			if err := binary.Read(r, binary.BigEndian, &id); err != nil {
+			if _, err := r.Read(uuidBuf); err != nil {
+				return err
+			}
+			id, err := uuid.FromBytes(uuidBuf)
+			if err != nil {
 				return err
 			}
 
@@ -204,7 +218,11 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 					return err
 				}
 				for j := 0; j < int(numEdges); j++ {
-					if err := binary.Read(r, binary.BigEndian, &neighborId); err != nil {
+					if _, err := r.Read(uuidBuf); err != nil {
+						return err
+					}
+					neighborId, err := uuid.FromBytes(uuidBuf)
+					if err != nil {
 						return err
 					}
 					if err := binary.Read(r, binary.BigEndian, &distance); err != nil {

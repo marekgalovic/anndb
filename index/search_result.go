@@ -1,9 +1,13 @@
 package index
 
+import (
+	"github.com/satori/go.uuid";
+)
+
 type SearchResult []SearchResultItem
 
 type SearchResultItem struct {
-	Id uint64
+	Id uuid.UUID
 	Metadata Metadata
 	Score float32
 }

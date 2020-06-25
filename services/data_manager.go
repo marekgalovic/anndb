@@ -30,7 +30,11 @@ func (this *dataManagerServer) Insert(ctx context.Context, req *pb.InsertRequest
 		return nil, err
 	}
 
-	if err := dataset.Insert(ctx, req.GetId(), req.GetValue(), req.GetMetadata()); err != nil {
+	id, err := uuid.FromBytes(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if err := dataset.Insert(ctx, id, req.GetValue(), req.GetMetadata()); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +51,11 @@ func (this *dataManagerServer) Update(ctx context.Context, req *pb.UpdateRequest
 		return nil, err
 	}
 
-	if err := dataset.Update(ctx, req.GetId(), req.GetValue(), req.GetMetadata()); err != nil {
+	id, err := uuid.FromBytes(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if err := dataset.Update(ctx, id, req.GetValue(), req.GetMetadata()); err != nil {
 		return nil, err
 	}
 
@@ -64,7 +72,11 @@ func (this *dataManagerServer) Remove(ctx context.Context, req *pb.RemoveRequest
 		return nil, err
 	}
 
-	if err := dataset.Remove(ctx, req.GetId()); err != nil {
+	id, err := uuid.FromBytes(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if err := dataset.Remove(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -213,10 +225,10 @@ func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.Partiti
 	return &pb.PartitionLenResponse{Len: len}, nil
 }
 
-func (this *dataManagerServer) errorsMapToBatchResponse(m map[uint64]error) map[uint64]string {
-	result := make(map[uint64]string)
+func (this *dataManagerServer) errorsMapToBatchResponse(m map[uuid.UUID]error) map[string]string {
+	result := make(map[string]string)
 	for id, err := range m {
-		result[id] = fmt.Sprintf("%s", err)
+		result[id.String()] = fmt.Sprintf("%s", err)
 	}
 	return result
 }

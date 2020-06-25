@@ -10,6 +10,8 @@ import (
     "github.com/marekgalovic/anndb/math";
     "github.com/marekgalovic/anndb/index/space";
     "github.com/marekgalovic/anndb/utils";
+
+    "github.com/satori/go.uuid";
 )
 
 const VERTICES_MAP_SHARD_COUNT int = 16
@@ -25,7 +27,7 @@ type Hnsw struct {
 	config *hnswConfig
 
     len uint64
-    vertices [VERTICES_MAP_SHARD_COUNT]map[uint64]*hnswVertex
+    vertices [VERTICES_MAP_SHARD_COUNT]map[uuid.UUID]*hnswVertex
     verticesMu [VERTICES_MAP_SHARD_COUNT]*sync.RWMutex
 
     entrypoint unsafe.Pointer
@@ -42,7 +44,7 @@ func NewHnsw(size uint, space space.Space, options ...HnswOption) *Hnsw {
 	}
 
     for i := 0; i < VERTICES_MAP_SHARD_COUNT; i++ {
-        index.vertices[i] = make(map[uint64]*hnswVertex)
+        index.vertices[i] = make(map[uuid.UUID]*hnswVertex)
         index.verticesMu[i] = &sync.RWMutex{}
     }
 
@@ -53,7 +55,7 @@ func (this *Hnsw) Len() int {
 	return int(atomic.LoadUint64(&this.len));
 }
 
-func (this *Hnsw) Insert(id uint64, value math.Vector, metadata Metadata, vertexLevel int) error {
+func (this *Hnsw) Insert(id uuid.UUID, value math.Vector, metadata Metadata, vertexLevel int) error {
     var vertex *hnswVertex
     if (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)) == nil {
         vertex = newHnswVertex(id, value, metadata, 0)
@@ -115,7 +117,7 @@ func (this *Hnsw) Insert(id uint64, value math.Vector, metadata Metadata, vertex
 	return nil;
 }
 
-func (this *Hnsw) Get(id uint64) (math.Vector, error) {
+func (this *Hnsw) Get(id uuid.UUID) (math.Vector, error) {
     m, mu := this.getVerticesShard(id)
     mu.RLock()
     defer mu.RUnlock()
@@ -126,7 +128,7 @@ func (this *Hnsw) Get(id uint64) (math.Vector, error) {
 	return nil, ItemNotFoundError
 }
 
-func (this *Hnsw) GetVertex(id uint64) (*hnswVertex, error) {
+func (this *Hnsw) GetVertex(id uuid.UUID) (*hnswVertex, error) {
     m, mu := this.getVerticesShard(id)
     mu.RLock()
     defer mu.RUnlock()
@@ -137,7 +139,7 @@ func (this *Hnsw) GetVertex(id uint64) (*hnswVertex, error) {
     return nil, ItemNotFoundError
 }
 
-func (this *Hnsw) Remove(id uint64) error {
+func (this *Hnsw) Remove(id uuid.UUID) error {
     vertex, err := this.removeVertex(id)
     if err != nil {
         return err
@@ -220,8 +222,9 @@ func (this *Hnsw) RandomLevel() int {
     return math.Floor(math.RandomExponential(this.config.levelMultiplier))
 }
 
-func (this *Hnsw) getVerticesShard(id uint64) (map[uint64]*hnswVertex, *sync.RWMutex) {
-    return this.vertices[id % uint64(VERTICES_MAP_SHARD_COUNT)], this.verticesMu[id % uint64(VERTICES_MAP_SHARD_COUNT)]
+func (this *Hnsw) getVerticesShard(id uuid.UUID) (map[uuid.UUID]*hnswVertex, *sync.RWMutex) {
+    shardIdx := utils.UuidMod(id, uint64(VERTICES_MAP_SHARD_COUNT))
+    return this.vertices[shardIdx], this.verticesMu[shardIdx]
 }
 
 func (this *Hnsw) storeVertex(vertex *hnswVertex) error {
@@ -238,7 +241,7 @@ func (this *Hnsw) storeVertex(vertex *hnswVertex) error {
     return nil
 }
 
-func (this *Hnsw) removeVertex(id uint64) (*hnswVertex, error) {
+func (this *Hnsw) removeVertex(id uuid.UUID) (*hnswVertex, error) {
     m, mu := this.getVerticesShard(id)
     defer mu.Unlock()
     mu.Lock()

@@ -4,12 +4,14 @@ import (
     "sync";
     
     "github.com/marekgalovic/anndb/math";
+
+    "github.com/satori/go.uuid";
 )
 
 type hnswEdgeSet map[*hnswVertex]float32
 
 type hnswVertex struct {
-    id uint64
+    id uuid.UUID
     vector math.Vector
     metadata Metadata
     level int
@@ -18,7 +20,7 @@ type hnswVertex struct {
     edgeMutexes []*sync.RWMutex
 }
 
-func newHnswVertex(id uint64, vector math.Vector, metadata Metadata, level int) *hnswVertex {
+func newHnswVertex(id uuid.UUID, vector math.Vector, metadata Metadata, level int) *hnswVertex {
     vertex := &hnswVertex {
         id: id,
         vector: vector,
@@ -31,7 +33,7 @@ func newHnswVertex(id uint64, vector math.Vector, metadata Metadata, level int) 
     return vertex
 }
 
-func (this *hnswVertex) Id() uint64 {
+func (this *hnswVertex) Id() uuid.UUID {
     return this.id
 }
 

@@ -1,16 +1,18 @@
 package main
 
 import (
-	"math/rand";
+	// "math/rand";
 	"context";
 	"time";
 	"sync/atomic";
 	"runtime";
+	"sync";
 
 	"github.com/marekgalovic/anndb/index";
 	"github.com/marekgalovic/anndb/index/space";
 	"github.com/marekgalovic/anndb/math";
 
+	"github.com/satori/go.uuid";
 	log "github.com/sirupsen/logrus";
 )
 
@@ -19,24 +21,31 @@ const dim int = 512
 var inserts uint64 = 0
 var deletes uint64 = 0
 
-func worker(ctx context.Context, index *index.Hnsw, tasks <- chan int64) {
+type workerTask struct {
+	insert bool
+	id uuid.UUID
+}
+
+func worker(ctx context.Context, index *index.Hnsw, tasks <- chan *workerTask, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	var err error
 	for {
 		select {
-		case id := <- tasks:
-			if id >= 0 {
-				err = index.Insert(uint64(id), math.RandomUniformVector(dim), nil, index.RandomLevel())
+		case t := <- tasks:
+			if t.insert {
+				err = index.Insert(t.id, math.RandomUniformVector(dim), nil, index.RandomLevel())
 				if err == nil {
 					atomic.AddUint64(&inserts, 1)
 				}
 			} else {
-				err = index.Remove(uint64(-id))
+				err = index.Remove(t.id)
 				if err == nil {
 					atomic.AddUint64(&deletes, 1)
 				}
 			}
 		case <- ctx.Done():
-			break
+			return
 		}
 	}
 }
@@ -45,24 +54,35 @@ func main() {
 	numThreads := runtime.NumCPU()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	idx := index.NewHnsw(uint(dim), space.NewEuclidean(), nil);
-	queue := make(chan int64)
+	idx := index.NewHnsw(uint(dim), space.NewEuclidean());
+	queue := make(chan *workerTask)
+	wg := &sync.WaitGroup{}
 	for i := 0; i < numThreads; i++ {
-		go worker(ctx, idx, queue)
+		wg.Add(1)
+		go worker(ctx, idx, queue, wg)
 	}
 
+	insertIds := make(map[uuid.UUID]struct{})
 	startAt := time.Now()
-	n := 10000
+	n := 100000
 	for i := 0; i < n; i++ {
 		if (i > 100) && (math.RandomUniform() <= 0.2) {
-			queue <- -rand.Int63n(int64(i-100))
+			var id uuid.UUID
+			for k := range insertIds {
+				id = k
+				break
+			}
+			delete(insertIds, id)
+			queue <- &workerTask{false, id}
 		} else {
-			queue <- int64(i)
+			id := uuid.NewV4()
+			insertIds[id] = struct{}{}
+			queue <- &workerTask{true, id}
 		}
 	}
 
-	time.Sleep(5 * time.Second)
 	cancel()
+	wg.Wait()
 
 	log.Infof("[%d, %.1f],", numThreads, float64(n) / float64(time.Since(startAt).Seconds()))
 }	

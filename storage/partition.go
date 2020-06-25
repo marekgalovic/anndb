@@ -133,7 +133,7 @@ func (this *partition) unloadRaft() error {
 	return nil
 }
 
-func (this *partition) insert(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
+func (this *partition) insert(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -142,7 +142,7 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector,
 
 	proposal := &pb.PartitionChange {
 		Type: pb.PartitionChangeType_PartitionChangeInsertValue,
-		Id: id,
+		Id: id.Bytes(),
 		Value: value,
 		Metadata: metadata,
 		Level: int32(this.index.RandomLevel()),
@@ -158,7 +158,7 @@ func (this *partition) insert(ctx context.Context, id uint64, value math.Vector,
 	return nil
 }
 
-func (this *partition) update(ctx context.Context, id uint64, value math.Vector, metadata index.Metadata) error {
+func (this *partition) update(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -167,7 +167,7 @@ func (this *partition) update(ctx context.Context, id uint64, value math.Vector,
 
 	proposal := &pb.PartitionChange {
 		Type: pb.PartitionChangeType_PartitionChangeUpdateValue,
-		Id: id,
+		Id: id.Bytes(),
 		Value: value,
 		Metadata: metadata,
 	}
@@ -182,7 +182,7 @@ func (this *partition) update(ctx context.Context, id uint64, value math.Vector,
 	return nil
 }
 
-func (this *partition) remove(ctx context.Context, id uint64) error {
+func (this *partition) remove(ctx context.Context, id uuid.UUID) error {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -191,7 +191,7 @@ func (this *partition) remove(ctx context.Context, id uint64) error {
 
 	proposal := &pb.PartitionChange {
 		Type: pb.PartitionChangeType_PartitionChangeDeleteValue,
-		Id: id,
+		Id: id.Bytes(),
 	}
 	
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
@@ -204,7 +204,7 @@ func (this *partition) remove(ctx context.Context, id uint64) error {
 	return nil
 }
 
-func (this *partition) batchInsert(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *partition) batchInsert(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -227,7 +227,7 @@ func (this *partition) batchInsert(ctx context.Context, items []*pb.BatchItem) (
 	return res.(partitionBatchResult), nil
 }
 
-func (this *partition) batchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *partition) batchUpdate(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -246,7 +246,7 @@ func (this *partition) batchUpdate(ctx context.Context, items []*pb.BatchItem) (
 	return res.(partitionBatchResult), nil
 }
 
-func (this *partition) batchRemove(ctx context.Context, items []*pb.BatchItem) (map[uint64]error, error) {
+func (this *partition) batchRemove(ctx context.Context, items []*pb.BatchItem) (map[uuid.UUID]error, error) {
 	this.raftMu.RLock()
 	defer this.raftMu.RUnlock()
 	if this.raft == nil {
@@ -332,13 +332,13 @@ func (this *partition) proposeAndWaitForCommit(ctx context.Context, proposal *pb
 	}
 }
 
-func (this *partition) insertValue(notificationId uuid.UUID, id uint64, value math.Vector, metadata index.Metadata, level int) error {
+func (this *partition) insertValue(notificationId uuid.UUID, id uuid.UUID, value math.Vector, metadata index.Metadata, level int) error {
 	err := this.index.Insert(id, value, metadata, level);
 	this.notificator.Notify(notificationId, err)
 	return nil
 }
 
-func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value math.Vector, metadata index.Metadata) error {
+func (this *partition) updateValue(notificationId uuid.UUID, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	vertex, err := this.index.GetVertex(id)
 	if err != nil {
 		this.notificator.Notify(notificationId, err)
@@ -358,7 +358,7 @@ func (this *partition) updateValue(notificationId uuid.UUID, id uint64, value ma
 	return nil
 }
 
-func (this *partition) deleteValue(notificationId uuid.UUID, id uint64) error {
+func (this *partition) deleteValue(notificationId uuid.UUID, id uuid.UUID) error {
 	err := this.index.Remove(id);
 	this.notificator.Notify(notificationId, err)
 	return nil
@@ -367,8 +367,12 @@ func (this *partition) deleteValue(notificationId uuid.UUID, id uint64) error {
 func (this *partition) batchInsertValue(notificationId uuid.UUID, items []*pb.BatchItem) error {
 	errors := make(partitionBatchResult)
 	for _, item := range items {
-		if err := this.index.Insert(item.GetId(), item.GetValue(), item.GetMetadata(), int(item.GetLevel())); err != nil {
-			errors[item.GetId()] = err
+		id, err := uuid.FromBytes(item.GetId())
+		if err != nil {
+			return err
+		}
+		if err := this.index.Insert(id, item.GetValue(), item.GetMetadata(), int(item.GetLevel())); err != nil {
+			errors[id] = err
 		}
 	}
 	this.notificator.Notify(notificationId, errors)
@@ -378,13 +382,17 @@ func (this *partition) batchInsertValue(notificationId uuid.UUID, items []*pb.Ba
 func (this *partition) batchUpdateValue(notificationId uuid.UUID, items []*pb.BatchItem) error {
 	errors := make(partitionBatchResult)
 	for _, item := range items {
-		vertex, err := this.index.GetVertex(item.GetId())
+		id, err := uuid.FromBytes(item.GetId())
 		if err != nil {
-			errors[item.GetId()] = err
+			return err
+		}
+		vertex, err := this.index.GetVertex(id)
+		if err != nil {
+			errors[id] = err
 			continue
 		}
-		if err := this.index.Remove(item.GetId()); err != nil {
-			errors[item.GetId()] = err
+		if err := this.index.Remove(id); err != nil {
+			errors[id] = err
 			continue
 		}
 		metadata := item.GetMetadata()
@@ -393,8 +401,8 @@ func (this *partition) batchUpdateValue(notificationId uuid.UUID, items []*pb.Ba
 				metadata[k] = v
 			}
 		}
-		if err := this.index.Insert(item.GetId(), item.GetValue(), metadata, vertex.Level()); err != nil {
-			errors[item.GetId()] = err
+		if err := this.index.Insert(id, item.GetValue(), metadata, vertex.Level()); err != nil {
+			errors[id] = err
 		}
 	}
 	this.notificator.Notify(notificationId, errors)
@@ -404,8 +412,12 @@ func (this *partition) batchUpdateValue(notificationId uuid.UUID, items []*pb.Ba
 func (this *partition) batchDeleteValue(notificationId uuid.UUID, items []*pb.BatchItem) error {
 	errors := make(partitionBatchResult)
 	for _, item := range items {
-		if err := this.index.Remove(item.GetId()); err != nil {
-			errors[item.GetId()] = err
+		id, err := uuid.FromBytes(item.GetId())
+		if err != nil {
+			return err
+		}
+		if err := this.index.Remove(id); err != nil {
+			errors[id] = err
 		}
 	}
 	this.notificator.Notify(notificationId, errors)
@@ -425,11 +437,23 @@ func (this *partition) process(data []byte) error {
 
 	switch change.Type {
 	case pb.PartitionChangeType_PartitionChangeInsertValue:
-		return this.insertValue(notificationId, change.GetId(), change.GetValue(), change.GetMetadata(), int(change.GetLevel()))
+		id, err := uuid.FromBytes(change.GetId())
+		if err != nil {
+			return err
+		}
+		return this.insertValue(notificationId, id, change.GetValue(), change.GetMetadata(), int(change.GetLevel()))
 	case pb.PartitionChangeType_PartitionChangeUpdateValue:
-		return this.updateValue(notificationId, change.GetId(), change.GetValue(), change.GetMetadata())
+		id, err := uuid.FromBytes(change.GetId())
+		if err != nil {
+			return err
+		}
+		return this.updateValue(notificationId, id, change.GetValue(), change.GetMetadata())
 	case pb.PartitionChangeType_PartitionChangeDeleteValue:
-		return this.deleteValue(notificationId, change.GetId())
+		id, err := uuid.FromBytes(change.GetId())
+		if err != nil {
+			return err
+		}
+		return this.deleteValue(notificationId, id)
 	case pb.PartitionChangeType_PartitionChangeBatchInsertValue:
 		return this.batchInsertValue(notificationId, change.GetBatchItems())
 	case pb.PartitionChangeType_PartitionChangeBatchUpdateValue:

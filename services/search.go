@@ -34,7 +34,7 @@ func (this *searchServer) Search(req *pb.SearchRequest, stream pb.Search_SearchS
 
 	for _, item := range items {
 		err := stream.Send(&pb.SearchResultItem {
-			Id: item.Id,
+			Id: item.Id.Bytes(),
 			Metadata: item.Metadata,
 			Score: item.Score,
 		})
@@ -70,7 +70,7 @@ func (this *searchServer) SearchPartitions(req *pb.SearchPartitionsRequest, stre
 
 	for _, item := range items {
 		err := stream.Send(&pb.SearchResultItem {
-			Id: item.Id,
+			Id: item.Id.Bytes(),
 			Metadata: item.Metadata,
 			Score: item.Score,
 		})
