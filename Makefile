@@ -4,7 +4,7 @@ CC_FLAGS=-masm=intel -mno-red-zone -mstackrealign -mllvm -inline-threshold=1000 
 AVX_FLAGS=-mavx
 # SSE_FLAGS=
 
-VERSION=0.0.1
+VERSION=0.0.2
 
 compile_avx:
 	$(CC) -S $(CC_FLAGS) $(AVX_FLAGS) ./simd/cpp/avx.cpp -o ./simd/cpp/avx.s
