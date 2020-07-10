@@ -16,8 +16,8 @@ compile_protos:
 	protoc -I ./protobuf/proto --go_out=plugins=grpc:./protobuf ./protobuf/proto/*.proto
 
 compile: compile_protos
-	GOOS=linux GOARCH=amd64 go build -o ./bin/anndb-linux-amd64 ./cmd/anndb/main.go
-	GOOS=darwin GOARCH=amd64 go build -o ./bin/anndb-darwin-amd64 ./cmd/anndb/main.go
+	GOOS=linux GOARCH=amd64 go build -o ./bin/anndb-linux-amd64-0.0.1 ./cmd/anndb/main.go
+	GOOS=darwin GOARCH=amd64 go build -o ./bin/anndb-darwin-amd64-0.0.1 ./cmd/anndb/main.go
 
 run_clean:
 	rm -rf ./data/${ID}
