@@ -14,6 +14,7 @@ import (
 	"github.com/satori/go.uuid";
 	"github.com/golang/protobuf/proto";
 	badger "github.com/dgraph-io/badger/v2";
+	log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -204,6 +205,7 @@ func (this *DatasetManager) createDataset(notificationId uuid.UUID, data []byte)
 		this.notificator.Notify(notificationId, err)
 		return nil
 	}
+	log.Infof("Create dataset: %s", id)
 	for _, partition := range this.datasets[id].partitions {
 		this.allocator.watch(partition)
 	}

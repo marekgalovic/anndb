@@ -10,6 +10,7 @@ import (
 	"github.com/marekgalovic/anndb/math";
 
 	"github.com/satori/go.uuid";
+	log "github.com/sirupsen/logrus";
 )
 
 var (
@@ -122,14 +123,28 @@ func (this *Allocator) run() {
 			}
 			switch update.(type) {
 			case *watchPartitionUpdate:
-				partition := update.(*watchPartitionUpdate).partition
-				if this.isPartitionAssignedToNode(partition) {
-					partition.loadRaft(partition.nodeIds())
+				_partition := update.(*watchPartitionUpdate).partition
+				if this.isPartitionAssignedToNode(_partition) {
+					func(partition *partition) {
+						defer func() {
+							if r := recover(); r != nil {
+								log.WithFields(log.Fields{"partition-id": partition.id}).Errorf("Partition loadRaft panicked.")
+							}
+						}()
+						partition.loadRaft(partition.nodeIds())
+					}(_partition)
 				}
 			case *unwatchPartitionUpdate:
-				partition := update.(*unwatchPartitionUpdate).partition
-				if this.isPartitionAssignedToNode(partition) {
-					partition.unloadRaft()
+				_partition := update.(*unwatchPartitionUpdate).partition
+				if this.isPartitionAssignedToNode(_partition) {
+					func(partition *partition) {
+						defer func() {
+							if r := recover(); r != nil {
+								log.WithFields(log.Fields{"partition-id": partition.id}).Errorf("Partition unloadRaft panicked.")
+							}
+						}()
+						partition.unloadRaft()	
+					}(_partition)
 				}
 			}
 		case <- this.ctx.Done():
