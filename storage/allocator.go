@@ -10,14 +10,13 @@ import (
 	"github.com/marekgalovic/anndb/math";
 
 	"github.com/satori/go.uuid";
-	// log "github.com/sirupsen/logrus";
 )
 
 var (
 	partitionNotFoundErr error = errors.New("Partition not found")
 )
 
-type allocator struct {
+type Allocator struct {
 	ctx context.Context
 	cancelCtx context.CancelFunc
 	clusterConn *cluster.Conn
@@ -35,10 +34,10 @@ type unwatchPartitionUpdate struct {
 	partition *partition
 }
 
-func NewAllocator(clusterConn *cluster.Conn) *allocator {
+func NewAllocator(clusterConn *cluster.Conn) *Allocator {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	a := &allocator {
+	a := &Allocator {
 		ctx: ctx,
 		cancelCtx: cancelCtx,
 		clusterConn: clusterConn,
@@ -53,12 +52,12 @@ func NewAllocator(clusterConn *cluster.Conn) *allocator {
 	return a
 }
 
-func (this *allocator) Stop() {
+func (this *Allocator) Stop() {
 	this.cancelCtx()
 	close(this.updatesC)
 }
 
-func (this *allocator) watch(partition *partition) {
+func (this *Allocator) watch(partition *partition) {
 	this.partitionsMu.Lock()
 	defer this.partitionsMu.Unlock()
 
@@ -68,7 +67,7 @@ func (this *allocator) watch(partition *partition) {
 	}
 }
 
-func (this *allocator) unwatch(id uuid.UUID) {
+func (this *Allocator) unwatch(id uuid.UUID) {
 	this.partitionsMu.Lock()
 	defer this.partitionsMu.Unlock()
 
@@ -78,7 +77,7 @@ func (this *allocator) unwatch(id uuid.UUID) {
 	}
 }
 
-func (this *allocator) getPartition(id uuid.UUID) (*partition, error) {
+func (this *Allocator) getPartition(id uuid.UUID) (*partition, error) {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
 
@@ -88,7 +87,7 @@ func (this *allocator) getPartition(id uuid.UUID) (*partition, error) {
 	return nil, partitionNotFoundErr
 }
 
-func (this *allocator) getPartitionsNodeIds(partitionCount uint, replicationFactor uint) [][]uint64 {
+func (this *Allocator) getPartitionsNodeIds(partitionCount uint, replicationFactor uint) [][]uint64 {
 	nodeIds := this.clusterConn.NodeIds()
 	partitionsNodeIds := make([][]uint64, partitionCount)
 	for i := 0; i < int(partitionCount); i++ {
@@ -102,7 +101,7 @@ func (this *allocator) getPartitionsNodeIds(partitionCount uint, replicationFact
 	return partitionsNodeIds
 }
 
-func (this *allocator) run() {
+func (this *Allocator) run() {
 	nodeChanges := this.clusterConn.NodeChangesNotifications()
 
 	for {
@@ -139,7 +138,7 @@ func (this *allocator) run() {
 	}
 }
 
-func (this *allocator) isPartitionAssignedToNode(partition *partition) bool {
+func (this *Allocator) isPartitionAssignedToNode(partition *partition) bool {
 	for _, nodeId := range partition.nodeIds() {
 		if this.clusterConn.Id() == nodeId {
 			return true
@@ -148,7 +147,7 @@ func (this *allocator) isPartitionAssignedToNode(partition *partition) bool {
 	return false
 }
 
-func (this *allocator) canModifyPartition(partition *partition) bool {
+func (this *Allocator) canModifyPartition(partition *partition) bool {
 	if len(partition.nodeIds()) > 0 {
 		return partition.nodeIds()[0] == this.clusterConn.Id()
 	}
@@ -157,7 +156,7 @@ func (this *allocator) canModifyPartition(partition *partition) bool {
 	return this.clusterConn.Id() == this.clusterConn.NodeIds()[0]
 }
 
-func (this *allocator) addNodeToPartitions(nodeId uint64) {
+func (this *Allocator) addNodeToPartitions(nodeId uint64) {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
 
@@ -168,7 +167,7 @@ func (this *allocator) addNodeToPartitions(nodeId uint64) {
 	}
 }
 
-func (this *allocator) removeNodeFromPartitions(nodeId uint64) {
+func (this *Allocator) removeNodeFromPartitions(nodeId uint64) {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
 

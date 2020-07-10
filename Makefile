@@ -15,14 +15,16 @@ compile_sse:
 compile_protos:
 	protoc -I ./protobuf/proto --go_out=plugins=grpc:./protobuf ./protobuf/proto/*.proto
 
+compile: compile_protos
+	GOOS=linux GOARCH=amd64 go build -o ./bin/anndb-linux-amd64 ./cmd/anndb/main.go
+	GOOS=darwin GOARCH=amd64 go build -o ./bin/anndb-darwin-amd64 ./cmd/anndb/main.go
+
 run_clean:
 	rm -rf ./data/${ID}
-	mkdir -p ./data/${ID}
 	go run cmd/anndb/main.go --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"
 
 run_clean_no_join:
 	rm -rf ./data/${ID}
-	mkdir -p ./data/${ID}
 	go run cmd/anndb/main.go --port="600${ID}" --join="false" --data-dir="./data/${ID}"
 
 run:

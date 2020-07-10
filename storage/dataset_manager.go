@@ -26,7 +26,7 @@ type DatasetManager struct {
 	raftWalDB *badger.DB
 	raftTransport *raft.RaftTransport
 	clusterConn *cluster.Conn
-	allocator *allocator
+	allocator *Allocator
 
 	datasets map[uuid.UUID]*Dataset
 	datasetsMu *sync.RWMutex
@@ -34,7 +34,7 @@ type DatasetManager struct {
 	notificator *utils.Notificator
 }
 
-func NewDatasetManager(raft raft.Group, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *allocator) (*DatasetManager, error) {
+func NewDatasetManager(raft raft.Group, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, allocator *Allocator) (*DatasetManager, error) {
 	dm := &DatasetManager {
 		raft: raft,
 		raftWalDB: raftWalDB,
