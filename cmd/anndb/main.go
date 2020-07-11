@@ -12,20 +12,22 @@ import (
 )
 
 func main() {
-	var noJoin bool
 	var joinNodesRaw string
 
 	config := anndb.NewConfig()
 	flag.Uint64Var(&config.RaftNodeId, "node-id", 0, "Raft node ID")
 	flag.StringVar(&config.Port, "port", utils.GetenvDefault("ANNDB_PORT", "6000"), "Node port")
 	flag.StringVar(&joinNodesRaw, "join", utils.GetenvDefault("ANNDB_JOIN", ""), "Comma separated list of existing cluster nodes")
-	flag.BoolVar(&noJoin, "no-join", false, "Do not join cluster")
 	flag.StringVar(&config.DataDir, "data-dir", utils.GetenvDefault("ANNDB_DATA_DIR", "/tmp"), "Data directory")
 	flag.StringVar(&config.TlsCertFile, "cert", utils.GetenvDefault("ANNDB_CERT", ""), "TLS Certificate file")
 	flag.StringVar(&config.TlsKeyFile, "key", utils.GetenvDefault("ANNDB_KEY", ""), "TLS Key file")
 	flag.Parse()
 
-	config.JoinNodes = splitCommaSeparatedValues(joinNodesRaw)
+	if joinNodesRaw == "false" {
+		config.DoNotJoinCluster = true
+	} else {
+		config.JoinNodes = splitCommaSeparatedValues(joinNodesRaw)
+	}
 
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(config.DataDir, os.ModePerm); err != nil {
@@ -40,7 +42,7 @@ func main() {
 	defer server.Stop()
 
 
-	if !noJoin {
+	if !config.DoNotJoinCluster {
 		if err := server.JoinCluster(); err != nil {
 			log.Fatal(err)
 		}

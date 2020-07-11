@@ -30,19 +30,14 @@ type Server struct {
 	zeroGroup *raft.RaftGroup
 	datasetManager *storage.DatasetManager
 	nodesManager *raft.NodesManager
-
-
 	grpcServer *grpc.Server
 	listener net.Listener
-
 }
 
 func NewServer(config *Config) *Server {
-	s := &Server {
+	return &Server {
 		config: config,
 	}
-
-	return s
 }
 
 func (this *Server) Stop() error {
@@ -66,7 +61,6 @@ func (this *Server) Run() error {
 }
 
 func (this *Server) JoinCluster() error {
-	log.Info(this.config.JoinNodes)
 	if len(this.config.JoinNodes) == 0 {
 		return nil
 	}
@@ -165,6 +159,10 @@ func (this *Server) getRaftNodeId(existingId uint64) (uint64, error) {
 }
 
 func (this *Server) getZeroNodeIds(nodeId uint64) []uint64 {
+	if this.config.DoNotJoinCluster {
+		return nil
+	}
+
 	if len(this.config.JoinNodes) == 0 {
 		return []uint64{nodeId}
 	}

@@ -5,6 +5,7 @@ type Config struct {
 	DataDir string
 	Port string
 	JoinNodes []string
+	DoNotJoinCluster bool
 	TlsCertFile string
 	TlsKeyFile string
 }
@@ -13,5 +14,6 @@ func NewConfig() *Config {
 	return &Config {
 		Port: "6000",
 		DataDir: "/anndb_data",
+		DoNotJoinCluster: false,
 	}
 }
