@@ -6,7 +6,6 @@ import (
 	"errors";
     "bytes";
     "sync/atomic";
-    // "math/rand";
 
     "github.com/marekgalovic/anndb/math";
     "github.com/marekgalovic/anndb/index/space";

@@ -15,7 +15,7 @@ import (
 
 func TestHnswSearchResultVsBruteForce(t *testing.T) {
 	space := space.NewEuclidean()
-    index := NewHnsw(64, space)
+    index := NewHnsw(64, space, HnswSearchAlgorithm(HnswSearchHeuristic))
 
     N := 100
     ids := make([]uuid.UUID, N)
