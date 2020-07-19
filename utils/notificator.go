@@ -2,8 +2,14 @@ package utils
 
 import (
 	"sync";
+	"errors";
 
 	"github.com/satori/go.uuid";
+)
+
+var (
+	ErrNotificatorChannelDoesNotExist error = errors.New("Notificator channel does not exist")
+	ErrNotificatorReceiverNotAvailable error = errors.New("Notificator receiver not available")
 )
 
 type Notificator struct {
@@ -18,9 +24,9 @@ func NewNotificator() *Notificator {
 	}
 }
 
-func (this *Notificator) Create() (<- chan interface{}, uuid.UUID) {
+func (this *Notificator) Create(bufSize int) (<- chan interface{}, uuid.UUID) {
 	id := uuid.NewV4()
-	c := make(chan interface{})
+	c := make(chan interface{}, bufSize)
 	this.mu.Lock()
 	this.chans[id] = c
 	this.mu.Unlock()
@@ -28,23 +34,35 @@ func (this *Notificator) Create() (<- chan interface{}, uuid.UUID) {
 	return c, id
 }
 
-func (this *Notificator) Remove(id uuid.UUID) {
+func (this *Notificator) Remove(id uuid.UUID) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 	if c, exists := this.chans[id]; exists {
 		delete(this.chans, id)
 		close(c)
+		return nil
 	}
+
+	return ErrNotificatorChannelDoesNotExist
 }
 
-func (this *Notificator) Notify(id uuid.UUID, v interface{}) {
+func (this *Notificator) Notify(id uuid.UUID, v interface{}, blocking bool) error {
 	this.mu.RLock()
 	defer this.mu.RUnlock()
+
 	if c, exists := this.chans[id]; exists {
-		select {
-		case c <- v:
-		default:
+		if blocking {
+			c <- v
+		} else {
+			select {
+			case c <- v:
+			default:
+				return ErrNotificatorReceiverNotAvailable
+			}	
 		}
+		return nil
 	}
+
+	return ErrNotificatorChannelDoesNotExist
 }
 

@@ -123,7 +123,7 @@ func (this *DatasetManager) Create(ctx context.Context, dataset *pb.Dataset) (*D
 		return nil, err
 	}
 
-	notifC, notifId := this.notificator.Create()
+	notifC, notifId := this.notificator.Create(0)
 	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal := &pb.DatasetManagerChange {
@@ -155,7 +155,7 @@ func (this *DatasetManager) Delete(ctx context.Context, id uuid.UUID) error {
 	ctx, cancelCtx := context.WithTimeout(ctx, 1 * time.Second)
 	defer cancelCtx()
 
-	notifC, notifId := this.notificator.Create()
+	notifC, notifId := this.notificator.Create(0)
 	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal := &pb.DatasetManagerChange {
@@ -196,20 +196,20 @@ func (this *DatasetManager) createDataset(notificationId uuid.UUID, data []byte)
 	this.datasetsMu.Lock()
 	defer this.datasetsMu.Unlock()
 	if _, exists := this.datasets[id]; exists {
-		this.notificator.Notify(notificationId, DatasetAlreadyExistsErr)
+		this.notificator.Notify(notificationId, DatasetAlreadyExistsErr, false)
 		return nil
 	}
 
 	this.datasets[id], err = newDataset(id, dataset, this.raftWalDB, this.raftTransport, this.clusterConn, this)
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 	log.Infof("Create dataset: %s", id)
 	for _, partition := range this.datasets[id].partitions {
 		this.allocator.watch(partition)
 	}
-	this.notificator.Notify(notificationId, nil)
+	this.notificator.Notify(notificationId, nil, false)
 	return nil
 }
 
@@ -224,7 +224,7 @@ func (this *DatasetManager) deleteDataset(notificationId uuid.UUID, data []byte)
 	dataset, exists := this.datasets[id]
 
 	if !exists {
-		this.notificator.Notify(notificationId, DatasetNotFoundErr)
+		this.notificator.Notify(notificationId, DatasetNotFoundErr, false)
 		return nil
 	}
 
@@ -233,7 +233,7 @@ func (this *DatasetManager) deleteDataset(notificationId uuid.UUID, data []byte)
 	}
 
 	delete(this.datasets, id)
-	this.notificator.Notify(notificationId, nil)
+	this.notificator.Notify(notificationId, nil, false)
 	return nil
 }
 
@@ -317,7 +317,7 @@ func (this *DatasetManager) proposePartitionNodesChangeAndWaitForCommit(ctx cont
 		return err
 	}
 
-	notifC, notifId := this.notificator.Create()
+	notifC, notifId := this.notificator.Create(0)
 	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal := &pb.DatasetManagerChange {
@@ -352,25 +352,25 @@ func (this *DatasetManager) updatePartitionNodes(notificationId uuid.UUID, data 
 
 	datasetId, err := uuid.FromBytes(change.GetDatasetId())
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 
 	partitionId, err := uuid.FromBytes(change.GetPartitionId())
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 
 	dataset, err := this.Get(datasetId)
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 
 	partition, err := dataset.getPartition(partitionId)
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 
@@ -381,6 +381,6 @@ func (this *DatasetManager) updatePartitionNodes(notificationId uuid.UUID, data 
 		partition.removeNode(change.GetNodeId())
 	}
 
-	this.notificator.Notify(notificationId, nil)
+	this.notificator.Notify(notificationId, nil, false)
 	return nil
 }

@@ -311,7 +311,7 @@ func (this *partition) proposeAndWaitForCommit(ctx context.Context, proposal *pb
 	ctx, cancelCtx := context.WithTimeout(ctx, proposalTimeout)
 	defer cancelCtx()
 
-	notifC, notifId := this.notificator.Create()
+	notifC, notifId := this.notificator.Create(0)
 	defer func() { this.notificator.Remove(notifId) }()
 
 	proposal.NotificationId = notifId.Bytes()
@@ -334,18 +334,18 @@ func (this *partition) proposeAndWaitForCommit(ctx context.Context, proposal *pb
 
 func (this *partition) insertValue(notificationId uuid.UUID, id uuid.UUID, value math.Vector, metadata index.Metadata, level int) error {
 	err := this.index.Insert(id, value, metadata, level);
-	this.notificator.Notify(notificationId, err)
+	this.notificator.Notify(notificationId, err, false)
 	return nil
 }
 
 func (this *partition) updateValue(notificationId uuid.UUID, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	vertex, err := this.index.GetVertex(id)
 	if err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 	if err := this.index.Remove(id); err != nil {
-		this.notificator.Notify(notificationId, err)
+		this.notificator.Notify(notificationId, err, false)
 		return nil
 	}
 	for k, v := range vertex.Metadata() {
@@ -354,13 +354,13 @@ func (this *partition) updateValue(notificationId uuid.UUID, id uuid.UUID, value
 		}
 	}
 	err = this.index.Insert(id, value, metadata, vertex.Level())
-	this.notificator.Notify(notificationId, err)
+	this.notificator.Notify(notificationId, err, false)
 	return nil
 }
 
 func (this *partition) deleteValue(notificationId uuid.UUID, id uuid.UUID) error {
 	err := this.index.Remove(id);
-	this.notificator.Notify(notificationId, err)
+	this.notificator.Notify(notificationId, err, false)
 	return nil
 }
 
@@ -375,7 +375,7 @@ func (this *partition) batchInsertValue(notificationId uuid.UUID, items []*pb.Ba
 			errors[id] = err
 		}
 	}
-	this.notificator.Notify(notificationId, errors)
+	this.notificator.Notify(notificationId, errors, false)
 	return nil
 }
 
@@ -405,7 +405,7 @@ func (this *partition) batchUpdateValue(notificationId uuid.UUID, items []*pb.Ba
 			errors[id] = err
 		}
 	}
-	this.notificator.Notify(notificationId, errors)
+	this.notificator.Notify(notificationId, errors, false)
 	return nil
 }
 
@@ -420,7 +420,7 @@ func (this *partition) batchDeleteValue(notificationId uuid.UUID, items []*pb.Ba
 			errors[id] = err
 		}
 	}
-	this.notificator.Notify(notificationId, errors)
+	this.notificator.Notify(notificationId, errors, false)
 	return nil
 }
 
