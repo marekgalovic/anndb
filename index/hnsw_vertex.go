@@ -2,6 +2,7 @@ package index
 
 import (
     "sync";
+    "sync/atomic";
     
     "github.com/marekgalovic/anndb/math";
 
@@ -47,6 +48,14 @@ func (this *hnswVertex) Metadata() Metadata {
 
 func (this *hnswVertex) Level() int {
     return this.level
+}
+
+func (this *hnswVertex) isDeleted() bool {
+    return atomic.LoadUint32(&this.deleted) == 1
+}
+
+func (this *hnswVertex) setDeleted() {
+    atomic.StoreUint32(&this.deleted, 1)
 }
 
 func (this *hnswVertex) setLevel(level int) {
