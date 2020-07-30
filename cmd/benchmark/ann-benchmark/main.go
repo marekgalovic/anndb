@@ -6,16 +6,19 @@ import (
 	"runtime";
 	"sync";
 	"time";
+	"encoding/binary";
+	"strings";
 
 	"github.com/marekgalovic/anndb/index";
 	// "github.com/marekgalovic/anndb/tau";
 	"github.com/marekgalovic/anndb/index/space";
 
+	"github.com/satori/go.uuid";
 	"gonum.org/v1/hdf5";
 	log "github.com/sirupsen/logrus";
 )
 
-const topK int = 100
+const topK int = 10
 
 func getDataset(f *hdf5.File, name string) (*hdf5.Dataset, []uint, error) {
 	d, err := f.OpenDataset(name)
@@ -33,6 +36,20 @@ func getDataset(f *hdf5.File, name string) (*hdf5.Dataset, []uint, error) {
 	}
 
 	return d, dims, nil
+}
+
+func readDim100(dataset *hdf5.Dataset, len uint) ([][]float32, error) {
+	v := make([][100]float32, len)
+	if err := dataset.Read(&v); err != nil {
+		return nil, err
+	}
+	
+	result := make([][]float32, len)
+	for i, vec := range v {
+		result[i] = make([]float32, 100)
+		copy(result[i], vec[:])
+	}
+	return result, nil
 }
 
 func readDim128(dataset *hdf5.Dataset, len uint) ([][]float32, error) {
@@ -63,24 +80,26 @@ func readDim784(dataset *hdf5.Dataset, len uint) ([][]float32, error) {
 	return result, nil
 }
 
-func readNeighbors(dataset *hdf5.Dataset, len uint) ([][]uint64, error) {
+func readNeighbors(dataset *hdf5.Dataset, len uint) ([][]uuid.UUID, error) {
 	v := make([][100]int32, len)
 	if err := dataset.Read(&v); err != nil {
 		return nil, err
 	}
 
-	result := make([][]uint64, len)
+	result := make([][]uuid.UUID, len)
 	for i, vec := range v {
-		result[i] = make([]uint64, 100)
+		result[i] = make([]uuid.UUID, 100)
 		for j, id := range vec {
-			result[i][j] = uint64(id)
+			_uuid := make([]byte, 16)
+			binary.LittleEndian.PutUint64(_uuid[:8], uint64(id))
+			result[i][j] = uuid.Must(uuid.FromBytes(_uuid))
 		}
 	}
 	return result, nil
 }
 
 type insertItem struct {
-	id uint64
+	id uuid.UUID
 	value []float32
 }
 
@@ -92,7 +111,7 @@ func insertWorker(ctx context.Context, index *index.Hnsw, tasks <- chan *insertI
 			if item == nil {
 				return
 			}
-			if err := index.Insert(item.id, item.value, index.RandomLevel()); err != nil {
+			if err := index.Insert(item.id, item.value, nil, index.RandomLevel()); err != nil {
 				log.Error(err)
 			}
 		case <- ctx.Done():
@@ -103,7 +122,7 @@ func insertWorker(ctx context.Context, index *index.Hnsw, tasks <- chan *insertI
 
 type searchTask struct {
 	query []float32
-	neighborIds []uint64
+	neighborIds []uuid.UUID
 }
 
 func searchWorker(ctx context.Context, index *index.Hnsw, tasks <- chan *searchTask, wg *sync.WaitGroup, rp *float64) {
@@ -125,8 +144,8 @@ func searchWorker(ctx context.Context, index *index.Hnsw, tasks <- chan *searchT
 	}
 }
 
-func recall(result index.SearchResult, neighbors []uint64, k int) float64 {
-	topKNeighbors := make(map[uint64]struct{})
+func recall(result index.SearchResult, neighbors []uuid.UUID, k int) float64 {
+	topKNeighbors := make(map[uuid.UUID]struct{})
 	for i := 0; i < k; i++ {
 		topKNeighbors[neighbors[i]] = struct{}{}
 	}
@@ -143,7 +162,9 @@ func recall(result index.SearchResult, neighbors []uint64, k int) float64 {
 
 func main() {
 	var filePath string
+	var hnswM int
 	flag.StringVar(&filePath, "file", "", "Dataset file")
+	flag.IntVar(&hnswM, "hnsw-m", 4, "M")
 	flag.Parse()
 
 	f, err := hdf5.OpenFile(filePath, hdf5.F_ACC_RDONLY)
@@ -161,8 +182,23 @@ func main() {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	euclidean := space.NewEuclidean()
-	idx := index.NewHnsw(dims[1], euclidean)
+	spaceParts := strings.Split(strings.TrimRight(filePath, ".hdf5"), "-")
+	spaceName := spaceParts[len(spaceParts)-1]
+	log.Infof("Space: %s", spaceName)
+
+	var _space space.Space
+	switch spaceName {
+	case "euclidean":
+		_space = space.NewEuclidean()
+	case "manhattan":
+		_space = space.NewManhattan()
+	case "angular":
+		_space = space.NewCosine()
+	default:
+		log.Fatal("Invalid space name")
+	}
+
+	idx := index.NewHnsw(dims[1], _space, index.HnswEfConstruction(500), index.HnswM(hnswM))
 
 	// Insert data to index
 	wg := &sync.WaitGroup{}
@@ -175,6 +211,8 @@ func main() {
 
 	var trainData [][]float32
 	switch dims[1] {
+	case 100:
+		trainData, err = readDim100(train, dims[0])
 	case 128:
 		trainData, err = readDim128(train, dims[0])
 	case 784:
@@ -189,7 +227,9 @@ func main() {
 	log.Info("Build index ...")
 	startAt := time.Now()
 	for id, value := range trainData {
-		tasks <- &insertItem {uint64(id), value[:]}
+		_uuid := make([]byte, 16)
+		binary.LittleEndian.PutUint64(_uuid[:8], uint64(id))
+		tasks <- &insertItem {uuid.Must(uuid.FromBytes(_uuid)), value[:]}
 	}
 
 	close(tasks)
@@ -210,6 +250,8 @@ func main() {
 
 	var testData [][]float32
 	switch dims[1] {
+	case 100:
+		testData, err = readDim100(test, dims[0])
 	case 128:
 		testData, err = readDim128(test, dims[0])
 	case 784:
