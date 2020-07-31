@@ -45,6 +45,10 @@ func (this *Euclidean) Distance(a, b math.Vector) float32 {
     return this.impl.EuclideanDistance(a, b)
 }
 
+func (this *Euclidean) String() string {
+    return "euclidean"
+}
+
 func NewManhattan() Space {
     return &Manhattan{newSpace()}
 }
@@ -53,11 +57,19 @@ func (this *Manhattan) Distance(a, b math.Vector) float32 {
     return this.impl.ManhattanDistance(a, b)
 }
 
+func (this *Manhattan) String() string {
+    return "manhattan"
+}
+
 func NewCosine() Space {
     return &Cosine{newSpace()}
 }
 
 func (this *Cosine) Distance(a, b math.Vector) float32 {
     return this.impl.CosineDistance(a, b)
+}
+
+func (this *Cosine) String() string {
+    return "cosine"
 }
 

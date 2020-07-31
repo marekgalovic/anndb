@@ -198,7 +198,8 @@ func main() {
 		log.Fatal("Invalid space name")
 	}
 
-	idx := index.NewHnsw(dims[1], _space, index.HnswEfConstruction(500), index.HnswM(hnswM))
+	idx := index.NewHnsw(dims[1], _space, index.HnswSearchAlgorithm(index.HnswSearchSimple), index.HnswEfConstruction(500), index.HnswM(hnswM))
+	log.Info(idx)
 
 	// Insert data to index
 	wg := &sync.WaitGroup{}

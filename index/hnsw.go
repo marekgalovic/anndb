@@ -1,6 +1,7 @@
 package index
 
 import (
+    "fmt";
     "errors";
     "context";
     "sync";
@@ -51,6 +52,10 @@ func NewHnsw(size uint, space space.Space, options ...HnswOption) *Hnsw {
     return index
 }
 
+func (this *Hnsw) String() string {
+    return fmt.Sprintf("HNSW(dim: %d, space: %s, config={%s})", this.size, this.space, this.config)
+}
+
 func (this *Hnsw) Len() int {
 	return int(atomic.LoadUint64(&this.len));
 }
@@ -87,7 +92,7 @@ func (this *Hnsw) Insert(id uuid.UUID, value math.Vector, metadata Metadata, ver
         case HnswSearchSimple:
             neighbors = this.selectNeighbors(neighbors, this.config.m)
         case HnswSearchHeuristic:
-            neighbors = this.selectNeighborsHeuristic(vertex.vector, neighbors, this.config.m, l, true, true)
+            neighbors = this.selectNeighborsHeuristic(vertex.vector, neighbors, this.config.m, l, this.config.heuristicExtendCandidates, this.config.heuristicKeepPruned)
         }
 
         mMax := this.config.mMax
@@ -204,7 +209,13 @@ func (this *Hnsw) Search(ctx context.Context, query math.Vector, k uint) (Search
 
     ef := math.MaxInt(this.config.ef, int(k))
     neighbors := this.searchLevel(query, entrypoint, ef, 0)
-    neighbors = this.selectNeighbors(neighbors, int(k))
+
+    switch this.config.searchAlgorithm {
+    case HnswSearchSimple:
+        neighbors = this.selectNeighbors(neighbors, int(k))
+    case HnswSearchHeuristic:
+        neighbors = this.selectNeighborsHeuristic(query, neighbors, int(k), 0, this.config.heuristicExtendCandidates, this.config.heuristicKeepPruned)
+    }
 
     n := math.MinInt(int(k), neighbors.Len())
     result := make(SearchResult, n)
@@ -402,7 +413,7 @@ func (this *Hnsw) pruneNeighbors(vertex *hnswVertex, k, level int) {
     case HnswSearchSimple:
         neighborsQueue = this.selectNeighbors(neighborsQueue, k)
     case HnswSearchHeuristic:
-        neighborsQueue = this.selectNeighborsHeuristic(vertex.vector, neighborsQueue, k, level, true, true)
+        neighborsQueue = this.selectNeighborsHeuristic(vertex.vector, neighborsQueue, k, level, this.config.heuristicExtendCandidates, this.config.heuristicKeepPruned)
     }
 
     newNeighbors := make(hnswEdgeSet, neighborsQueue.Len())

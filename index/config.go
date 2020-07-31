@@ -1,6 +1,7 @@
 package index
 
 import (
+    "fmt";
     "io";
     "encoding/binary";
 
@@ -78,6 +79,18 @@ func HnswSearchAlgorithm(value hnswSearchAlgorithm) HnswOption {
     }}
 }
 
+func HnswHeuristicExtendCandidates(value bool) HnswOption {
+    return &hnswOption{func(config *hnswConfig) {
+        config.heuristicExtendCandidates = value
+    }}
+}
+
+func HnswHeuristicKeepPruned(value bool) HnswOption {
+    return &hnswOption{func(config *hnswConfig) {
+        config.heuristicKeepPruned = value
+    }}
+}
+
 type hnswConfig struct {
     searchAlgorithm hnswSearchAlgorithm
     levelMultiplier float32
@@ -86,6 +99,8 @@ type hnswConfig struct {
     m int
     mMax int
     mMax0 int
+    heuristicExtendCandidates bool
+    heuristicKeepPruned bool
 }
 
 func newHnswConfig(options []HnswOption) *hnswConfig {
@@ -97,6 +112,8 @@ func newHnswConfig(options []HnswOption) *hnswConfig {
         m: 16,
         mMax: -1,
         mMax0: -1,
+        heuristicExtendCandidates: false,
+        heuristicKeepPruned: true,
 	}
 	for _, option := range options {
 		option.apply(config)
@@ -113,6 +130,21 @@ func newHnswConfig(options []HnswOption) *hnswConfig {
     }
 
     return config
+}
+
+func (this *hnswConfig) String() string {
+    return fmt.Sprintf(
+        "searchAlgorithm: %s, ef: %d, efConstruction: %d, m: %d, mMax: %d, mMax0: %d, levelMultiplier: %.4f, extendCandidates: %t, keepPruned: %t",
+        this.searchAlgorithm,
+        this.ef,
+        this.efConstruction,
+        this.m,
+        this.mMax,
+        this.mMax0,
+        this.levelMultiplier,
+        this.heuristicExtendCandidates,
+        this.heuristicKeepPruned,
+    )
 }
 
 func (this *hnswConfig) save(w io.Writer) error {

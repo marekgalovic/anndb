@@ -1,0 +1,175 @@
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 4
+time="2020-07-30T18:43:31Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:43:31Z" level=info msg="Build index ..."
+time="2020-07-30T18:43:42Z" level=info msg="Built in: 10.317602982s (5815.30 inserts/s)"
+time="2020-07-30T18:43:42Z" level=info msg=Search...
+time="2020-07-30T18:43:42Z" level=info msg="Search duration: 170.158666ms (58768.68 queries/s)"
+time="2020-07-30T18:43:42Z" level=info msg="Avg recall: 0.7081"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 8
+time="2020-07-30T18:43:43Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:43:43Z" level=info msg="Build index ..."
+time="2020-07-30T18:43:56Z" level=info msg="Built in: 13.259666017s (4525.00 inserts/s)"
+time="2020-07-30T18:43:56Z" level=info msg=Search...
+time="2020-07-30T18:43:56Z" level=info msg="Search duration: 221.395169ms (45168.10 queries/s)"
+time="2020-07-30T18:43:56Z" level=info msg="Avg recall: 0.9006"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 12
+time="2020-07-30T18:43:57Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:43:57Z" level=info msg="Build index ..."
+time="2020-07-30T18:44:12Z" level=info msg="Built in: 15.114260957s (3969.76 inserts/s)"
+time="2020-07-30T18:44:12Z" level=info msg=Search...
+time="2020-07-30T18:44:13Z" level=info msg="Search duration: 289.286297ms (34567.83 queries/s)"
+time="2020-07-30T18:44:13Z" level=info msg="Avg recall: 0.9391"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 16
+time="2020-07-30T18:44:13Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:44:13Z" level=info msg="Build index ..."
+time="2020-07-30T18:44:31Z" level=info msg="Built in: 17.738998946s (3382.38 inserts/s)"
+time="2020-07-30T18:44:31Z" level=info msg=Search...
+time="2020-07-30T18:44:32Z" level=info msg="Search duration: 382.958857ms (26112.47 queries/s)"
+time="2020-07-30T18:44:32Z" level=info msg="Avg recall: 0.9453"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 24
+time="2020-07-30T18:44:32Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:44:33Z" level=info msg="Build index ..."
+time="2020-07-30T18:44:55Z" level=info msg="Built in: 22.186394693s (2704.36 inserts/s)"
+time="2020-07-30T18:44:55Z" level=info msg=Search...
+time="2020-07-30T18:44:55Z" level=info msg="Search duration: 448.222139ms (22310.37 queries/s)"
+time="2020-07-30T18:44:55Z" level=info msg="Avg recall: 0.9413"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 36
+time="2020-07-30T18:44:56Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:44:56Z" level=info msg="Build index ..."
+time="2020-07-30T18:45:25Z" level=info msg="Built in: 29.040573917s (2066.07 inserts/s)"
+time="2020-07-30T18:45:25Z" level=info msg=Search...
+time="2020-07-30T18:45:26Z" level=info msg="Search duration: 522.031068ms (19155.95 queries/s)"
+time="2020-07-30T18:45:26Z" level=info msg="Avg recall: 0.9447"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 48
+time="2020-07-30T18:45:26Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:45:27Z" level=info msg="Build index ..."
+time="2020-07-30T18:46:02Z" level=info msg="Built in: 35.346759731s (1697.47 inserts/s)"
+time="2020-07-30T18:46:02Z" level=info msg=Search...
+time="2020-07-30T18:46:03Z" level=info msg="Search duration: 1.273258839s (7853.86 queries/s)"
+time="2020-07-30T18:46:03Z" level=info msg="Avg recall: 0.9536"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 64
+time="2020-07-30T18:46:04Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:46:04Z" level=info msg="Build index ..."
+time="2020-07-30T18:46:54Z" level=info msg="Built in: 49.842841975s (1203.78 inserts/s)"
+time="2020-07-30T18:46:54Z" level=info msg=Search...
+time="2020-07-30T18:46:55Z" level=info msg="Search duration: 787.580648ms (12697.11 queries/s)"
+time="2020-07-30T18:46:55Z" level=info msg="Avg recall: 0.9576"
+Dataset: ./data/fashion-mnist-784-euclidean.hdf5, M: 96
+time="2020-07-30T18:46:55Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:46:56Z" level=info msg="Build index ..."
+time="2020-07-30T18:48:07Z" level=info msg="Built in: 1m10.912751645s (846.11 inserts/s)"
+time="2020-07-30T18:48:07Z" level=info msg=Search...
+time="2020-07-30T18:48:08Z" level=info msg="Search duration: 1.712835354s (5838.27 queries/s)"
+time="2020-07-30T18:48:08Z" level=info msg="Avg recall: 0.9653"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 4
+time="2020-07-30T18:48:09Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:48:10Z" level=info msg="Build index ..."
+time="2020-07-30T18:51:54Z" level=info msg="Built in: 3m44.457599256s (4455.18 inserts/s)"
+time="2020-07-30T18:51:54Z" level=info msg=Search...
+time="2020-07-30T18:51:54Z" level=info msg="Search duration: 170.590395ms (58619.95 queries/s)"
+time="2020-07-30T18:51:54Z" level=info msg="Avg recall: 0.3488"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 8
+time="2020-07-30T18:51:55Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:51:56Z" level=info msg="Build index ..."
+time="2020-07-30T18:57:02Z" level=info msg="Built in: 5m5.862743727s (3269.44 inserts/s)"
+time="2020-07-30T18:57:02Z" level=info msg=Search...
+time="2020-07-30T18:57:02Z" level=info msg="Search duration: 222.550491ms (44933.62 queries/s)"
+time="2020-07-30T18:57:02Z" level=info msg="Avg recall: 0.5859"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 12
+time="2020-07-30T18:57:02Z" level=info msg="Space: euclidean"
+time="2020-07-30T18:57:03Z" level=info msg="Build index ..."
+time="2020-07-30T19:03:10Z" level=info msg="Built in: 6m7.117647431s (2723.92 inserts/s)"
+time="2020-07-30T19:03:10Z" level=info msg=Search...
+time="2020-07-30T19:03:11Z" level=info msg="Search duration: 475.842895ms (21015.34 queries/s)"
+time="2020-07-30T19:03:11Z" level=info msg="Avg recall: 0.7168"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 16
+time="2020-07-30T19:03:11Z" level=info msg="Space: euclidean"
+time="2020-07-30T19:03:12Z" level=info msg="Build index ..."
+time="2020-07-30T19:11:10Z" level=info msg="Built in: 7m57.406766879s (2094.65 inserts/s)"
+time="2020-07-30T19:11:10Z" level=info msg=Search...
+time="2020-07-30T19:11:10Z" level=info msg="Search duration: 311.997017ms (32051.59 queries/s)"
+time="2020-07-30T19:11:10Z" level=info msg="Avg recall: 0.7796"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 24
+time="2020-07-30T19:11:11Z" level=info msg="Space: euclidean"
+time="2020-07-30T19:11:11Z" level=info msg="Build index ..."
+time="2020-07-30T19:21:18Z" level=info msg="Built in: 10m6.915075069s (1647.68 inserts/s)"
+time="2020-07-30T19:21:18Z" level=info msg=Search...
+time="2020-07-30T19:21:19Z" level=info msg="Search duration: 415.022517ms (24095.08 queries/s)"
+time="2020-07-30T19:21:19Z" level=info msg="Avg recall: 0.8361"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 36
+time="2020-07-30T19:21:20Z" level=info msg="Space: euclidean"
+time="2020-07-30T19:21:20Z" level=info msg="Build index ..."
+time="2020-07-30T19:36:16Z" level=info msg="Built in: 14m55.276694272s (1116.97 inserts/s)"
+time="2020-07-30T19:36:16Z" level=info msg=Search...
+time="2020-07-30T19:36:16Z" level=info msg="Search duration: 509.927698ms (19610.62 queries/s)"
+time="2020-07-30T19:36:16Z" level=info msg="Avg recall: 0.8921"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 48
+time="2020-07-30T19:36:17Z" level=info msg="Space: euclidean"
+time="2020-07-30T19:36:18Z" level=info msg="Build index ..."
+time="2020-07-30T19:54:47Z" level=info msg="Built in: 18m29.480326661s (901.32 inserts/s)"
+time="2020-07-30T19:54:47Z" level=info msg=Search...
+time="2020-07-30T19:54:48Z" level=info msg="Search duration: 631.730216ms (15829.54 queries/s)"
+time="2020-07-30T19:54:48Z" level=info msg="Avg recall: 0.9177"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 64
+time="2020-07-30T19:54:49Z" level=info msg="Space: euclidean"
+time="2020-07-30T19:54:49Z" level=info msg="Build index ..."
+time="2020-07-30T20:21:25Z" level=info msg="Built in: 26m35.165372086s (626.89 inserts/s)"
+time="2020-07-30T20:21:25Z" level=info msg=Search...
+time="2020-07-30T20:21:27Z" level=info msg="Search duration: 2.020252844s (4949.88 queries/s)"
+time="2020-07-30T20:21:27Z" level=info msg="Avg recall: 0.9369"
+Dataset: ./data/sift-128-euclidean.hdf5, M: 96
+time="2020-07-30T20:21:28Z" level=info msg="Space: euclidean"
+time="2020-07-30T20:21:28Z" level=info msg="Build index ..."
+time="2020-07-30T20:59:22Z" level=info msg="Built in: 37m53.124981269s (439.92 inserts/s)"
+time="2020-07-30T20:59:22Z" level=info msg=Search...
+time="2020-07-30T20:59:23Z" level=info msg="Search duration: 1.13194707s (8834.34 queries/s)"
+time="2020-07-30T20:59:23Z" level=info msg="Avg recall: 0.9569"
+Dataset: ./data/glove-100-angular.hdf5, M: 4
+time="2020-07-30T20:59:24Z" level=info msg="Space: angular"
+time="2020-07-30T20:59:25Z" level=info msg="Build index ..."
+time="2020-07-30T21:04:39Z" level=info msg="Built in: 5m13.974976594s (3769.45 inserts/s)"
+time="2020-07-30T21:04:39Z" level=info msg=Search...
+time="2020-07-30T21:04:39Z" level=info msg="Search duration: 169.702909ms (58926.51 queries/s)"
+time="2020-07-30T21:04:39Z" level=info msg="Avg recall: 0.1339"
+Dataset: ./data/glove-100-angular.hdf5, M: 8
+time="2020-07-30T21:04:40Z" level=info msg="Space: angular"
+time="2020-07-30T21:04:41Z" level=info msg="Build index ..."
+time="2020-07-30T21:12:01Z" level=info msg="Built in: 7m20.777608885s (2685.06 inserts/s)"
+time="2020-07-30T21:12:01Z" level=info msg=Search...
+time="2020-07-30T21:12:02Z" level=info msg="Search duration: 675.115732ms (14812.28 queries/s)"
+time="2020-07-30T21:12:02Z" level=info msg="Avg recall: 0.3009"
+Dataset: ./data/glove-100-angular.hdf5, M: 12
+time="2020-07-30T21:12:03Z" level=info msg="Space: angular"
+time="2020-07-30T21:12:04Z" level=info msg="Build index ..."
+time="2020-07-30T21:21:00Z" level=info msg="Built in: 8m56.823891061s (2204.66 inserts/s)"
+time="2020-07-30T21:21:00Z" level=info msg=Search...
+time="2020-07-30T21:21:01Z" level=info msg="Search duration: 305.642111ms (32718.00 queries/s)"
+time="2020-07-30T21:21:01Z" level=info msg="Avg recall: 0.4101"
+Dataset: ./data/glove-100-angular.hdf5, M: 16
+time="2020-07-30T21:21:01Z" level=info msg="Space: angular"
+time="2020-07-30T21:21:02Z" level=info msg="Build index ..."
+time="2020-07-30T21:32:48Z" level=info msg="Built in: 11m45.39172747s (1677.81 inserts/s)"
+time="2020-07-30T21:32:48Z" level=info msg=Search...
+time="2020-07-30T21:32:48Z" level=info msg="Search duration: 457.11752ms (21876.21 queries/s)"
+time="2020-07-30T21:32:48Z" level=info msg="Avg recall: 0.4847"
+Dataset: ./data/glove-100-angular.hdf5, M: 24
+time="2020-07-30T21:32:49Z" level=info msg="Space: angular"
+time="2020-07-30T21:32:50Z" level=info msg="Build index ..."
+time="2020-07-30T21:48:10Z" level=info msg="Built in: 15m20.422507117s (1285.84 inserts/s)"
+time="2020-07-30T21:48:10Z" level=info msg=Search...
+time="2020-07-30T21:48:10Z" level=info msg="Search duration: 492.364802ms (20310.14 queries/s)"
+time="2020-07-30T21:48:10Z" level=info msg="Avg recall: 0.5895"
+Dataset: ./data/glove-100-angular.hdf5, M: 36
+time="2020-07-30T21:48:11Z" level=info msg="Space: angular"
+time="2020-07-30T21:48:12Z" level=info msg="Build index ..."
+time="2020-07-30T22:11:31Z" level=info msg="Built in: 23m18.607892682s (846.21 inserts/s)"
+time="2020-07-30T22:11:31Z" level=info msg=Search...
+time="2020-07-30T22:11:31Z" level=info msg="Search duration: 670.253385ms (14919.73 queries/s)"
+time="2020-07-30T22:11:31Z" level=info msg="Avg recall: 0.6575"
+Dataset: ./data/glove-100-angular.hdf5, M: 48
+time="2020-07-30T22:11:32Z" level=info msg="Space: angular"
+time="2020-07-30T22:11:33Z" level=info msg="Build index ..."
+time="2020-07-30T22:41:02Z" level=info msg="Built in: 29m28.835025595s (669.09 inserts/s)"
+time="2020-07-30T22:41:02Z" level=info msg=Search...
+time="2020-07-30T22:41:03Z" level=info msg="Search duration: 834.375583ms (11985.01 queries/s)"
+time="2020-07-30T22:41:03Z" level=info msg="Avg recall: 0.7093"
