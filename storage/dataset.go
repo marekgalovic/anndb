@@ -90,78 +90,40 @@ func (this *Dataset) Meta() *pb.Dataset {
 }
 
 func (this *Dataset) Len(ctx context.Context) (uint64, error) {
-	this.partitionsMu.RLock()
-	defer this.partitionsMu.RUnlock()
+	l, _, err := this.SizeInfo(ctx)
+	return l, err
 
-	var result uint64 = 0
-	wg := &sync.WaitGroup{}
-	errorCh := make(chan error, len(this.partitions))
-	for _, partition := range this.partitions {
-		if partition.isOnNode(this.clusterConn.Id()) {
-			atomic.AddUint64(&result, uint64(partition.len()))
-			errorCh <- nil
-		} else {
-			wg.Add(1)
-			go func(ctx context.Context, wg *sync.WaitGroup, errorCh chan error, result *uint64) {
-				defer wg.Done()
-				client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
-				if err != nil {
-					errorCh <- err
-					return
-				}
-				resp, err := client.PartitionLen(ctx, &pb.PartitionInfoRequest{
-					DatasetId:   this.id.Bytes(),
-					PartitionId: partition.id.Bytes(),
-				})
-				if err != nil {
-					errorCh <- err
-					return
-				}
-				atomic.AddUint64(result, resp.GetLen())
-			}(ctx, wg, errorCh, &result)
-		}
-	}
-
-	go func() {
-		wg.Wait()
-		close(errorCh)
-	}()
-
-	for i := 0; i < len(this.partitions); i++ {
-		select {
-		case err := <-errorCh:
-			if err != nil {
-				return 0, err
-			}
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		}
-	}
-
-	return atomic.LoadUint64(&result), nil
 }
 
 func (this *Dataset) BytesSize(ctx context.Context) (uint64, error) {
+	_, bs, err := this.SizeInfo(ctx)
+	return bs, err
+}
+
+func (this *Dataset) SizeInfo(ctx context.Context) (uint64, uint64, error) {
 	this.partitionsMu.RLock()
 	defer this.partitionsMu.RUnlock()
 
-	var result uint64 = 0
+	var resultLen uint64 = 0
+	var resultBytesSize uint64 = 0
+
 	wg := &sync.WaitGroup{}
 	errorCh := make(chan error, len(this.partitions))
 	for _, partition := range this.partitions {
 		if partition.isOnNode(this.clusterConn.Id()) {
-			atomic.AddUint64(&result, uint64(partition.bytesSize()))
+			atomic.AddUint64(&resultLen, uint64(partition.len()))
+			atomic.AddUint64(&resultBytesSize, partition.bytesSize())
 			errorCh <- nil
 		} else {
 			wg.Add(1)
-			go func(ctx context.Context, wg *sync.WaitGroup, errorCh chan error, result *uint64) {
+			go func(ctx context.Context, wg *sync.WaitGroup, errorCh chan error, len *uint64, bytesSize *uint64) {
 				defer wg.Done()
 				client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
 				if err != nil {
 					errorCh <- err
 					return
 				}
-				resp, err := client.PartitionBytesSize(ctx, &pb.PartitionInfoRequest{
+				resp, err := client.PartitionInfo(ctx, &pb.PartitionInfoRequest{
 					DatasetId:   this.id.Bytes(),
 					PartitionId: partition.id.Bytes(),
 				})
@@ -169,8 +131,9 @@ func (this *Dataset) BytesSize(ctx context.Context) (uint64, error) {
 					errorCh <- err
 					return
 				}
-				atomic.AddUint64(result, resp.GetBytesSize())
-			}(ctx, wg, errorCh, &result)
+				atomic.AddUint64(len, resp.GetLen())
+				atomic.AddUint64(bytesSize, resp.GetBytesSize())
+			}(ctx, wg, errorCh, &resultLen, &resultBytesSize)
 		}
 	}
 
@@ -183,40 +146,27 @@ func (this *Dataset) BytesSize(ctx context.Context) (uint64, error) {
 		select {
 		case err := <-errorCh:
 			if err != nil {
-				return 0, err
+				return 0, 0, err
 			}
 		case <-ctx.Done():
-			return 0, ctx.Err()
+			return 0, 0, ctx.Err()
 		}
 	}
 
-	return atomic.LoadUint64(&result), nil
+	return atomic.LoadUint64(&resultLen), atomic.LoadUint64(&resultBytesSize), nil
 }
 
-func (this *Dataset) PartitionLen(ctx context.Context, partitionId uuid.UUID) (uint64, error) {
+func (this *Dataset) PartitionInfo(ctx context.Context, partitionId uuid.UUID) (uint64, uint64, error) {
 	partition, err := this.getPartition(partitionId)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	if !partition.isOnNode(this.clusterConn.Id()) {
-		return 0, PartitionNotOnNodeErr
+		return 0, 0, PartitionNotOnNodeErr
 	}
 
-	return uint64(partition.len()), nil
-}
-
-func (this *Dataset) PartitionBytesSize(ctx context.Context, partitionId uuid.UUID) (uint64, error) {
-	partition, err := this.getPartition(partitionId)
-	if err != nil {
-		return 0, err
-	}
-
-	if !partition.isOnNode(this.clusterConn.Id()) {
-		return 0, PartitionNotOnNodeErr
-	}
-
-	return uint64(partition.bytesSize()), nil
+	return uint64(partition.len()), partition.bytesSize(), nil
 }
 
 func (this *Dataset) Insert(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {

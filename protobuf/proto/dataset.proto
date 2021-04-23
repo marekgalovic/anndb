@@ -8,6 +8,7 @@ service DatasetManager {
 	rpc Get(GetDatasetRequest) returns (Dataset);
 	rpc Create(Dataset) returns (Dataset);
 	rpc Delete(UUIDRequest) returns (EmptyMessage);
+	rpc GetDatasetSize(GetDatasetRequest) returns (DatasetSize);
 }
 
 service DataManager {
@@ -20,8 +21,7 @@ service DataManager {
 	rpc PartitionBatchInsert(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchUpdate(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchRemove(PartitionBatchRequest) returns (BatchResponse);
-	rpc PartitionLen(PartitionInfoRequest) returns (PartitionLenResponse);
-	rpc PartitionBytesSize(PartitionInfoRequest) returns (PartitionBytesSizeResponse);
+	rpc PartitionInfo(PartitionInfoRequest) returns (PartitionInfoResponse);
 }
 
 message ListDatasetsRequest {
@@ -79,12 +79,9 @@ message PartitionInfoRequest {
 	bytes partition_id = 2;
 }
 
-message PartitionLenResponse {
+message PartitionInfoResponse {
 	uint64 len = 1;
-}
-
-message PartitionBytesSizeResponse {
-	uint64 bytes_size = 1;
+	uint64 bytes_size = 2;
 }
 
 enum Space {
@@ -101,6 +98,11 @@ message Dataset {
 	uint32 replication_factor = 5;
 	repeated Partition partitions = 6;
 	uint64 size = 7;
+}
+
+message DatasetSize {
+	uint64 len = 1;
+	uint64 bytes_size = 2;
 }
 
 message Partition {

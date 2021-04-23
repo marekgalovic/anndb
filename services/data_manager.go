@@ -203,7 +203,7 @@ func (this *dataManagerServer) PartitionBatchRemove(ctx context.Context, req *pb
 	return &pb.BatchResponse{Errors: this.errorsMapToBatchResponse(errors)}, nil
 }
 
-func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.PartitionInfoRequest) (*pb.PartitionLenResponse, error) {
+func (this *dataManagerServer) PartitionInfo(ctx context.Context, req *pb.PartitionInfoRequest) (*pb.PartitionInfoResponse, error) {
 	datasetId, err := uuid.FromBytes(req.GetDatasetId())
 	if err != nil {
 		return nil, err
@@ -217,34 +217,12 @@ func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.Partiti
 		return nil, err
 	}
 
-	len, err := dataset.PartitionLen(ctx, partitionId)
+	len, bs, err := dataset.PartitionInfo(ctx, partitionId)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.PartitionLenResponse{Len: len}, nil
-}
-
-func (this *dataManagerServer) PartitionBytesSize(ctx context.Context, req *pb.PartitionInfoRequest) (*pb.PartitionBytesSizeResponse, error) {
-	datasetId, err := uuid.FromBytes(req.GetDatasetId())
-	if err != nil {
-		return nil, err
-	}
-	partitionId, err := uuid.FromBytes(req.GetPartitionId())
-	if err != nil {
-		return nil, err
-	}
-	dataset, err := this.datasetManager.Get(datasetId)
-	if err != nil {
-		return nil, err
-	}
-
-	bs, err := dataset.PartitionBytesSize(ctx, partitionId)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.PartitionBytesSizeResponse{BytesSize: bs}, nil
+	return &pb.PartitionInfoResponse{Len: len, BytesSize: bs}, nil
 }
 
 func (this *dataManagerServer) errorsMapToBatchResponse(m map[uuid.UUID]error) map[string]string {

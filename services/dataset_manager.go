@@ -1,12 +1,11 @@
 package services
 
 import (
-	"context";
+	"context"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/storage";
-
-	"github.com/satori/go.uuid";
+	pb "github.com/marekgalovic/anndb/protobuf"
+	"github.com/marekgalovic/anndb/storage"
+	uuid "github.com/satori/go.uuid"
 )
 
 type datasetManagerServer struct {
@@ -14,7 +13,7 @@ type datasetManagerServer struct {
 }
 
 func NewDatasetManagerServer(manager *storage.DatasetManager) *datasetManagerServer {
-	return &datasetManagerServer {
+	return &datasetManagerServer{
 		manager: manager,
 	}
 }
@@ -76,4 +75,26 @@ func (this *datasetManagerServer) Delete(ctx context.Context, req *pb.UUIDReques
 	}
 
 	return &pb.EmptyMessage{}, nil
+}
+
+func (this *datasetManagerServer) GetDatasetSize(ctx context.Context, req *pb.GetDatasetRequest) (*pb.DatasetSize, error) {
+	id, err := uuid.FromBytes(req.GetDatasetId())
+	if err != nil {
+		return nil, err
+	}
+
+	dataset, err := this.manager.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	len, bs, err := dataset.SizeInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.DatasetSize{
+		Len:       len,
+		BytesSize: bs,
+	}, nil
 }
