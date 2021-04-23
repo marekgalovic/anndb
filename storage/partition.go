@@ -1,25 +1,25 @@
 package storage
 
 import (
-	"context";
-	"time";
-	"bytes";
-	"errors";
-	"sync";
-	"math/rand";
+	"bytes"
+	"context"
+	"errors"
+	"math/rand"
+	"sync"
+	"time"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/math";
-	"github.com/marekgalovic/anndb/index";
-	"github.com/marekgalovic/anndb/index/space";
-	"github.com/marekgalovic/anndb/storage/raft";
-	"github.com/marekgalovic/anndb/storage/wal";
-	"github.com/marekgalovic/anndb/utils";
+	"github.com/marekgalovic/anndb/index"
+	"github.com/marekgalovic/anndb/index/space"
+	"github.com/marekgalovic/anndb/math"
+	pb "github.com/marekgalovic/anndb/protobuf"
+	"github.com/marekgalovic/anndb/storage/raft"
+	"github.com/marekgalovic/anndb/storage/wal"
+	"github.com/marekgalovic/anndb/utils"
+	uuid "github.com/satori/go.uuid"
 
-	"github.com/satori/go.uuid";
-	"github.com/golang/protobuf/proto";
-	badger "github.com/dgraph-io/badger/v2";
-	log "github.com/sirupsen/logrus";
+	badger "github.com/dgraph-io/badger/v2"
+	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 )
 
 const proposalTimeout time.Duration = 5 * time.Second
@@ -29,16 +29,16 @@ var (
 )
 
 type partition struct {
-	id uuid.UUID
-	meta *pb.Partition
+	id      uuid.UUID
+	meta    *pb.Partition
 	dataset *Dataset
-	index *index.Hnsw
+	index   *index.Hnsw
 
-	raft *raft.RaftGroup
-	wal wal.WAL
-	raftTransport *raft.RaftTransport
+	raft           *raft.RaftGroup
+	wal            wal.WAL
+	raftTransport  *raft.RaftTransport
 	datasetManager *DatasetManager
-	raftMu *sync.RWMutex
+	raftMu         *sync.RWMutex
 
 	notificator *utils.Notificator
 
@@ -56,22 +56,22 @@ func newIndexFromDatasetProto(dataset *pb.Dataset) *index.Hnsw {
 		s = space.NewCosine()
 	}
 
-	return index.NewHnsw(uint(dataset.GetDimension()), s) 
+	return index.NewHnsw(uint(dataset.GetDimension()), s)
 }
 
 func newPartition(id uuid.UUID, meta *pb.Partition, dataset *Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, datasetManager *DatasetManager) *partition {
-	p := &partition {
-		id: id,
-		meta: meta,
-		dataset: dataset,
-		index: newIndexFromDatasetProto(dataset.Meta()),
-		raft: nil,
-		wal: wal.NewBadgerWAL(raftWalDB, id),
-		raftTransport: raftTransport,
+	p := &partition{
+		id:             id,
+		meta:           meta,
+		dataset:        dataset,
+		index:          newIndexFromDatasetProto(dataset.Meta()),
+		raft:           nil,
+		wal:            wal.NewBadgerWAL(raftWalDB, id),
+		raftTransport:  raftTransport,
 		datasetManager: datasetManager,
-		raftMu: &sync.RWMutex{},
-		notificator: utils.NewNotificator(),
-		log: log.WithFields(log.Fields {
+		raftMu:         &sync.RWMutex{},
+		notificator:    utils.NewNotificator(),
+		log: log.WithFields(log.Fields{
 			"partition_id": id,
 		}),
 	}
@@ -94,6 +94,10 @@ func (this *partition) close() {
 
 func (this *partition) len() int {
 	return this.index.Len()
+}
+
+func (this *partition) bytesSize() uint64 {
+	return this.index.BytesSize()
 }
 
 func (this *partition) loadRaft(nodeIds []uint64) error {
@@ -140,12 +144,12 @@ func (this *partition) insert(ctx context.Context, id uuid.UUID, value math.Vect
 		return RaftNotLoadedOnNodeErr
 	}
 
-	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_PartitionChangeInsertValue,
-		Id: id.Bytes(),
-		Value: value,
+	proposal := &pb.PartitionChange{
+		Type:     pb.PartitionChangeType_PartitionChangeInsertValue,
+		Id:       id.Bytes(),
+		Value:    value,
 		Metadata: metadata,
-		Level: int32(this.index.RandomLevel()),
+		Level:    int32(this.index.RandomLevel()),
 	}
 
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
@@ -165,10 +169,10 @@ func (this *partition) update(ctx context.Context, id uuid.UUID, value math.Vect
 		return RaftNotLoadedOnNodeErr
 	}
 
-	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_PartitionChangeUpdateValue,
-		Id: id.Bytes(),
-		Value: value,
+	proposal := &pb.PartitionChange{
+		Type:     pb.PartitionChangeType_PartitionChangeUpdateValue,
+		Id:       id.Bytes(),
+		Value:    value,
 		Metadata: metadata,
 	}
 
@@ -189,11 +193,11 @@ func (this *partition) remove(ctx context.Context, id uuid.UUID) error {
 		return RaftNotLoadedOnNodeErr
 	}
 
-	proposal := &pb.PartitionChange {
+	proposal := &pb.PartitionChange{
 		Type: pb.PartitionChangeType_PartitionChangeDeleteValue,
-		Id: id.Bytes(),
+		Id:   id.Bytes(),
 	}
-	
+
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
 	if err != nil {
 		return err
@@ -215,8 +219,8 @@ func (this *partition) batchInsert(ctx context.Context, items []*pb.BatchItem) (
 		item.Level = int32(this.index.RandomLevel())
 	}
 
-	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_PartitionChangeBatchInsertValue,
+	proposal := &pb.PartitionChange{
+		Type:       pb.PartitionChangeType_PartitionChangeBatchInsertValue,
 		BatchItems: items,
 	}
 
@@ -234,11 +238,11 @@ func (this *partition) batchUpdate(ctx context.Context, items []*pb.BatchItem) (
 		return nil, RaftNotLoadedOnNodeErr
 	}
 
-	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_PartitionChangeBatchUpdateValue,
+	proposal := &pb.PartitionChange{
+		Type:       pb.PartitionChangeType_PartitionChangeBatchUpdateValue,
 		BatchItems: items,
 	}
-	
+
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
 	if err != nil {
 		return nil, err
@@ -253,11 +257,11 @@ func (this *partition) batchRemove(ctx context.Context, items []*pb.BatchItem) (
 		return nil, RaftNotLoadedOnNodeErr
 	}
 
-	proposal := &pb.PartitionChange {
-		Type: pb.PartitionChangeType_PartitionChangeBatchDeleteValue,
+	proposal := &pb.PartitionChange{
+		Type:       pb.PartitionChangeType_PartitionChangeBatchDeleteValue,
 		BatchItems: items,
 	}
-	
+
 	res, err := this.proposeAndWaitForCommit(ctx, proposal)
 	if err != nil {
 		return nil, err
@@ -325,15 +329,15 @@ func (this *partition) proposeAndWaitForCommit(ctx context.Context, proposal *pb
 	}
 
 	select {
-	case res := <- notifC:
+	case res := <-notifC:
 		return res, nil
-	case <- ctx.Done():
+	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
 func (this *partition) insertValue(notificationId uuid.UUID, id uuid.UUID, value math.Vector, metadata index.Metadata, level int) error {
-	err := this.index.Insert(id, value, metadata, level);
+	err := this.index.Insert(id, value, metadata, level)
 	this.notificator.Notify(notificationId, err, false)
 	return nil
 }
@@ -359,7 +363,7 @@ func (this *partition) updateValue(notificationId uuid.UUID, id uuid.UUID, value
 }
 
 func (this *partition) deleteValue(notificationId uuid.UUID, id uuid.UUID) error {
-	err := this.index.Remove(id);
+	err := this.index.Remove(id)
 	this.notificator.Notify(notificationId, err, false)
 	return nil
 }

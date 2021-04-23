@@ -20,7 +20,8 @@ service DataManager {
 	rpc PartitionBatchInsert(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchUpdate(PartitionBatchRequest) returns (BatchResponse);
 	rpc PartitionBatchRemove(PartitionBatchRequest) returns (BatchResponse);
-	rpc PartitionLen(PartitionLenRequest) returns (PartitionLenResponse);
+	rpc PartitionLen(PartitionInfoRequest) returns (PartitionLenResponse);
+	rpc PartitionBytesSize(PartitionInfoRequest) returns (PartitionBytesSizeResponse);
 }
 
 message ListDatasetsRequest {
@@ -73,13 +74,17 @@ message BatchResponse {
 	map<string, string> errors = 1;
 }
 
-message PartitionLenRequest {
+message PartitionInfoRequest {
 	bytes dataset_id = 1;
 	bytes partition_id = 2;
 }
 
 message PartitionLenResponse {
 	uint64 len = 1;
+}
+
+message PartitionBytesSizeResponse {
+	uint64 bytes_size = 1;
 }
 
 enum Space {

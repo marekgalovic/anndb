@@ -1,13 +1,13 @@
 package services
 
 import (
-	"fmt";
-	"context";
+	"context"
+	"fmt"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/storage";
+	pb "github.com/marekgalovic/anndb/protobuf"
+	"github.com/marekgalovic/anndb/storage"
 
-	"github.com/satori/go.uuid";
+	uuid "github.com/satori/go.uuid"
 )
 
 type dataManagerServer struct {
@@ -15,7 +15,7 @@ type dataManagerServer struct {
 }
 
 func NewDataManagerServer(datasetManager *storage.DatasetManager) *dataManagerServer {
-	return &dataManagerServer {
+	return &dataManagerServer{
 		datasetManager: datasetManager,
 	}
 }
@@ -203,7 +203,7 @@ func (this *dataManagerServer) PartitionBatchRemove(ctx context.Context, req *pb
 	return &pb.BatchResponse{Errors: this.errorsMapToBatchResponse(errors)}, nil
 }
 
-func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.PartitionLenRequest) (*pb.PartitionLenResponse, error) {
+func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.PartitionInfoRequest) (*pb.PartitionLenResponse, error) {
 	datasetId, err := uuid.FromBytes(req.GetDatasetId())
 	if err != nil {
 		return nil, err
@@ -223,6 +223,28 @@ func (this *dataManagerServer) PartitionLen(ctx context.Context, req *pb.Partiti
 	}
 
 	return &pb.PartitionLenResponse{Len: len}, nil
+}
+
+func (this *dataManagerServer) PartitionBytesSize(ctx context.Context, req *pb.PartitionInfoRequest) (*pb.PartitionBytesSizeResponse, error) {
+	datasetId, err := uuid.FromBytes(req.GetDatasetId())
+	if err != nil {
+		return nil, err
+	}
+	partitionId, err := uuid.FromBytes(req.GetPartitionId())
+	if err != nil {
+		return nil, err
+	}
+	dataset, err := this.datasetManager.Get(datasetId)
+	if err != nil {
+		return nil, err
+	}
+
+	bs, err := dataset.PartitionBytesSize(ctx, partitionId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PartitionBytesSizeResponse{BytesSize: bs}, nil
 }
 
 func (this *dataManagerServer) errorsMapToBatchResponse(m map[uuid.UUID]error) map[string]string {

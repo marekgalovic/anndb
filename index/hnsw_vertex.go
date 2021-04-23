@@ -1,104 +1,108 @@
 package index
 
 import (
-    "sync";
-    "sync/atomic";
-    
-    "github.com/marekgalovic/anndb/math";
+	"sync"
+	"sync/atomic"
 
-    "github.com/satori/go.uuid";
+	"github.com/marekgalovic/anndb/math"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 type hnswEdgeSet map[*hnswVertex]float32
 
 type hnswVertex struct {
-    id uuid.UUID
-    vector math.Vector
-    metadata Metadata
-    level int
-    deleted uint32
-    edges []hnswEdgeSet
-    edgeMutexes []*sync.RWMutex
+	id          uuid.UUID
+	vector      math.Vector
+	metadata    Metadata
+	level       int
+	deleted     uint32
+	edges       []hnswEdgeSet
+	edgeMutexes []*sync.RWMutex
 }
 
 func newHnswVertex(id uuid.UUID, vector math.Vector, metadata Metadata, level int) *hnswVertex {
-    vertex := &hnswVertex {
-        id: id,
-        vector: vector,
-        metadata: metadata,
-        level: level,
-        deleted: 0,
-    }
-    vertex.setLevel(level)
+	vertex := &hnswVertex{
+		id:       id,
+		vector:   vector,
+		metadata: metadata,
+		level:    level,
+		deleted:  0,
+	}
+	vertex.setLevel(level)
 
-    return vertex
+	return vertex
 }
 
 func (this *hnswVertex) Id() uuid.UUID {
-    return this.id
+	return this.id
 }
 
 func (this *hnswVertex) Vector() math.Vector {
-    return this.vector
+	return this.vector
 }
 
 func (this *hnswVertex) Metadata() Metadata {
-    return this.metadata
+	return this.metadata
 }
 
 func (this *hnswVertex) Level() int {
-    return this.level
+	return this.level
 }
 
 func (this *hnswVertex) isDeleted() bool {
-    return atomic.LoadUint32(&this.deleted) == 1
+	return atomic.LoadUint32(&this.deleted) == 1
 }
 
 func (this *hnswVertex) setDeleted() {
-    atomic.StoreUint32(&this.deleted, 1)
+	atomic.StoreUint32(&this.deleted, 1)
 }
 
 func (this *hnswVertex) setLevel(level int) {
-    this.edges = make([]hnswEdgeSet, level + 1)
-    this.edgeMutexes = make([]*sync.RWMutex, level + 1)
+	this.edges = make([]hnswEdgeSet, level+1)
+	this.edgeMutexes = make([]*sync.RWMutex, level+1)
 
-    for i := 0; i <= level; i++ {
-        this.edges[i] = make(hnswEdgeSet)
-        this.edgeMutexes[i] = &sync.RWMutex{}
-    }
+	for i := 0; i <= level; i++ {
+		this.edges[i] = make(hnswEdgeSet)
+		this.edgeMutexes[i] = &sync.RWMutex{}
+	}
 }
 
 func (this *hnswVertex) edgesCount(level int) int {
-    defer this.edgeMutexes[level].RUnlock()
-    this.edgeMutexes[level].RLock()
+	defer this.edgeMutexes[level].RUnlock()
+	this.edgeMutexes[level].RLock()
 
-    return len(this.edges[level])
+	return len(this.edges[level])
 }
 
 func (this *hnswVertex) addEdge(level int, edge *hnswVertex, distance float32) {
-    defer this.edgeMutexes[level].Unlock()
-    this.edgeMutexes[level].Lock()
+	defer this.edgeMutexes[level].Unlock()
+	this.edgeMutexes[level].Lock()
 
-    this.edges[level][edge] = distance
+	this.edges[level][edge] = distance
 }
 
 func (this *hnswVertex) removeEdge(level int, edge *hnswVertex) {
-    defer this.edgeMutexes[level].Unlock()
-    this.edgeMutexes[level].Lock()
+	defer this.edgeMutexes[level].Unlock()
+	this.edgeMutexes[level].Lock()
 
-    delete(this.edges[level], edge);
+	delete(this.edges[level], edge)
 }
 
 func (this *hnswVertex) getEdges(level int) hnswEdgeSet {
-    defer this.edgeMutexes[level].RUnlock()
-    this.edgeMutexes[level].RLock()
+	defer this.edgeMutexes[level].RUnlock()
+	this.edgeMutexes[level].RLock()
 
-    return this.edges[level]
+	return this.edges[level]
 }
 
 func (this *hnswVertex) setEdges(level int, edges hnswEdgeSet) {
-    defer this.edgeMutexes[level].Unlock()
-    this.edgeMutexes[level].Lock()
+	defer this.edgeMutexes[level].Unlock()
+	this.edgeMutexes[level].Lock()
 
-    this.edges[level] = edges
+	this.edges[level] = edges
+}
+
+func (this *hnswVertex) bytesSize() uint64 {
+	return uuid.Size + math.VECTOR_COMPONENT_BYTES_SIZE*uint64(len(this.vector)) + this.metadata.bytesSize()
 }

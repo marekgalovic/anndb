@@ -1,31 +1,31 @@
 package storage
 
 import (
-	"errors";
-	"context";
-	"sync";
-	"sync/atomic";
-	"math/rand";
-	"sort";
-	"io";
+	"context"
+	"errors"
+	"io"
+	"math/rand"
+	"sort"
+	"sync"
+	"sync/atomic"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/cluster";
-	"github.com/marekgalovic/anndb/index";
-	"github.com/marekgalovic/anndb/math";
-	"github.com/marekgalovic/anndb/storage/raft";
-	"github.com/marekgalovic/anndb/utils";
-	
-	"github.com/satori/go.uuid";
-	badger "github.com/dgraph-io/badger/v2";
+	"github.com/marekgalovic/anndb/cluster"
+	"github.com/marekgalovic/anndb/index"
+	"github.com/marekgalovic/anndb/math"
+	pb "github.com/marekgalovic/anndb/protobuf"
+	"github.com/marekgalovic/anndb/storage/raft"
+	"github.com/marekgalovic/anndb/utils"
+
+	badger "github.com/dgraph-io/badger/v2"
+	uuid "github.com/satori/go.uuid"
 )
 
 const maxBatchRequestSize int = 100
 
 var (
-	DimensionMissmatchErr error = errors.New("Value dimension does not match dataset dimension")
-	PartitionNotFoundErr error = errors.New("Partition not found")
-	PartitionNotOnNodeErr error = errors.New("Partition is not loaded on the node")
+	DimensionMissmatchErr    error = errors.New("Value dimension does not match dataset dimension")
+	PartitionNotFoundErr     error = errors.New("Partition not found")
+	PartitionNotOnNodeErr    error = errors.New("Partition is not loaded on the node")
 	BatchRequestTooLargerErr error = errors.New("Batch request too large")
 )
 
@@ -34,32 +34,32 @@ type partitionBatchRequestRemoteFn func(pb.DataManagerClient, context.Context, *
 type partitionBatchRequestLocalFn func(*partition, context.Context, []*pb.BatchItem) (map[uuid.UUID]error, error)
 
 type Dataset struct {
-	id uuid.UUID
-	len int
-	meta *pb.Dataset
+	id          uuid.UUID
+	len         int
+	meta        *pb.Dataset
 	clusterConn *cluster.Conn
 
-	partitions []*partition
+	partitions    []*partition
 	partitionsMap map[uuid.UUID]*partition
-	partitionsMu *sync.RWMutex
+	partitionsMu  *sync.RWMutex
 
-	searchClients map[uint64]pb.SearchClient
-	searchClientsMu *sync.RWMutex
-	dataManagerClients map[uint64]pb.DataManagerClient
+	searchClients        map[uint64]pb.SearchClient
+	searchClientsMu      *sync.RWMutex
+	dataManagerClients   map[uint64]pb.DataManagerClient
 	dataManagerClientsMu *sync.RWMutex
 }
 
 func newDataset(id uuid.UUID, meta pb.Dataset, raftWalDB *badger.DB, raftTransport *raft.RaftTransport, clusterConn *cluster.Conn, datasetManager *DatasetManager) (*Dataset, error) {
-	d := &Dataset {
-		id: id,
-		meta: &meta,
-		clusterConn: clusterConn,
-		partitions: make([]*partition, meta.GetPartitionCount()),
-		partitionsMap: make(map[uuid.UUID]*partition),
-		partitionsMu: &sync.RWMutex{},
-		searchClients: make(map[uint64]pb.SearchClient),
-		searchClientsMu: &sync.RWMutex{},
-		dataManagerClients: make(map[uint64]pb.DataManagerClient),
+	d := &Dataset{
+		id:                   id,
+		meta:                 &meta,
+		clusterConn:          clusterConn,
+		partitions:           make([]*partition, meta.GetPartitionCount()),
+		partitionsMap:        make(map[uuid.UUID]*partition),
+		partitionsMu:         &sync.RWMutex{},
+		searchClients:        make(map[uint64]pb.SearchClient),
+		searchClientsMu:      &sync.RWMutex{},
+		dataManagerClients:   make(map[uint64]pb.DataManagerClient),
 		dataManagerClientsMu: &sync.RWMutex{},
 	}
 
@@ -109,8 +109,8 @@ func (this *Dataset) Len(ctx context.Context) (uint64, error) {
 					errorCh <- err
 					return
 				}
-				resp, err := client.PartitionLen(ctx, &pb.PartitionLenRequest {
-					DatasetId: this.id.Bytes(),
+				resp, err := client.PartitionLen(ctx, &pb.PartitionInfoRequest{
+					DatasetId:   this.id.Bytes(),
 					PartitionId: partition.id.Bytes(),
 				})
 				if err != nil {
@@ -129,11 +129,63 @@ func (this *Dataset) Len(ctx context.Context) (uint64, error) {
 
 	for i := 0; i < len(this.partitions); i++ {
 		select {
-		case err := <- errorCh:
+		case err := <-errorCh:
 			if err != nil {
 				return 0, err
 			}
-		case <- ctx.Done():
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
+	}
+
+	return atomic.LoadUint64(&result), nil
+}
+
+func (this *Dataset) BytesSize(ctx context.Context) (uint64, error) {
+	this.partitionsMu.RLock()
+	defer this.partitionsMu.RUnlock()
+
+	var result uint64 = 0
+	wg := &sync.WaitGroup{}
+	errorCh := make(chan error, len(this.partitions))
+	for _, partition := range this.partitions {
+		if partition.isOnNode(this.clusterConn.Id()) {
+			atomic.AddUint64(&result, uint64(partition.bytesSize()))
+			errorCh <- nil
+		} else {
+			wg.Add(1)
+			go func(ctx context.Context, wg *sync.WaitGroup, errorCh chan error, result *uint64) {
+				defer wg.Done()
+				client, err := this.getDataManagerClient(ctx, partition.randomNodeId())
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				resp, err := client.PartitionBytesSize(ctx, &pb.PartitionInfoRequest{
+					DatasetId:   this.id.Bytes(),
+					PartitionId: partition.id.Bytes(),
+				})
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				atomic.AddUint64(result, resp.GetBytesSize())
+			}(ctx, wg, errorCh, &result)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	for i := 0; i < len(this.partitions); i++ {
+		select {
+		case err := <-errorCh:
+			if err != nil {
+				return 0, err
+			}
+		case <-ctx.Done():
 			return 0, ctx.Err()
 		}
 	}
@@ -154,6 +206,19 @@ func (this *Dataset) PartitionLen(ctx context.Context, partitionId uuid.UUID) (u
 	return uint64(partition.len()), nil
 }
 
+func (this *Dataset) PartitionBytesSize(ctx context.Context, partitionId uuid.UUID) (uint64, error) {
+	partition, err := this.getPartition(partitionId)
+	if err != nil {
+		return 0, err
+	}
+
+	if !partition.isOnNode(this.clusterConn.Id()) {
+		return 0, PartitionNotOnNodeErr
+	}
+
+	return uint64(partition.bytesSize()), nil
+}
+
 func (this *Dataset) Insert(ctx context.Context, id uuid.UUID, value math.Vector, metadata index.Metadata) error {
 	if err := this.checkDimension(&value); err != nil {
 		return err
@@ -166,11 +231,11 @@ func (this *Dataset) Insert(ctx context.Context, id uuid.UUID, value math.Vector
 		if err != nil {
 			return nil
 		}
-		_, err = client.Insert(ctx, &pb.InsertRequest {
+		_, err = client.Insert(ctx, &pb.InsertRequest{
 			DatasetId: this.id.Bytes(),
-			Id: id.Bytes(),
-			Value: value,
-			Metadata: metadata,
+			Id:        id.Bytes(),
+			Value:     value,
+			Metadata:  metadata,
 		})
 		return err
 	}
@@ -190,11 +255,11 @@ func (this *Dataset) Update(ctx context.Context, id uuid.UUID, value math.Vector
 		if err != nil {
 			return nil
 		}
-		_, err = client.Update(ctx, &pb.UpdateRequest {
+		_, err = client.Update(ctx, &pb.UpdateRequest{
 			DatasetId: this.id.Bytes(),
-			Id: id.Bytes(),
-			Value: value,
-			Metadata: metadata,
+			Id:        id.Bytes(),
+			Value:     value,
+			Metadata:  metadata,
 		})
 		return err
 	}
@@ -210,9 +275,9 @@ func (this *Dataset) Remove(ctx context.Context, id uuid.UUID) error {
 		if err != nil {
 			return nil
 		}
-		_, err = client.Remove(ctx, &pb.RemoveRequest {
+		_, err = client.Remove(ctx, &pb.RemoveRequest{
 			DatasetId: this.id.Bytes(),
-			Id: id.Bytes(),
+			Id:        id.Bytes(),
 		})
 		return err
 	}
@@ -356,14 +421,14 @@ func (this *Dataset) Search(ctx context.Context, query math.Vector, k uint) (ind
 		close(errorCh)
 	}()
 
-	result := make(index.SearchResult, 0, int(k) * len(nodePartitions))
+	result := make(index.SearchResult, 0, int(k)*len(nodePartitions))
 	for i := 0; i < len(nodePartitions); i++ {
 		select {
-		case items := <- resultCh:
+		case items := <-resultCh:
 			result = append(result, items...)
-		case err := <- errorCh:
+		case err := <-errorCh:
 			return nil, err
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
 	}
@@ -386,7 +451,7 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 	defer cancelCtx()
 
 	wg := &sync.WaitGroup{}
-	resultCh := make(chan index.SearchResult, len(partitions))	
+	resultCh := make(chan index.SearchResult, len(partitions))
 	errorCh := make(chan error, len(partitions))
 
 	for _, partition := range partitions {
@@ -400,14 +465,14 @@ func (this *Dataset) SearchPartitions(ctx context.Context, partitionIds []uuid.U
 		close(errorCh)
 	}()
 
-	result := make(index.SearchResult, 0, int(k) * len(partitions))
+	result := make(index.SearchResult, 0, int(k)*len(partitions))
 	for i := 0; i < len(partitions); i++ {
 		select {
-		case items := <- resultCh:
+		case items := <-resultCh:
 			result = append(result, items...)
-		case err := <- errorCh:
+		case err := <-errorCh:
 			return nil, err
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
 	}
@@ -470,11 +535,11 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 		partitionIdsBytes[i] = partitionId.Bytes()
 	}
 
-	request := &pb.SearchPartitionsRequest {
-		DatasetId: this.Meta().GetId(),
+	request := &pb.SearchPartitionsRequest{
+		DatasetId:    this.Meta().GetId(),
 		PartitionIds: partitionIdsBytes,
-		Query: query,
-		K: uint32(k),
+		Query:        query,
+		K:            uint32(k),
 	}
 
 	stream, err := client.SearchPartitions(ctx, request)
@@ -498,10 +563,10 @@ func (this *Dataset) searchPartitionsOnNode(ctx context.Context, nodeId uint64, 
 			errorCh <- err
 		}
 
-		result = append(result, index.SearchResultItem {
-			Id: id,
+		result = append(result, index.SearchResultItem{
+			Id:       id,
 			Metadata: item.GetMetadata(),
-			Score: item.GetScore(),
+			Score:    item.GetScore(),
 		})
 	}
 
@@ -549,11 +614,11 @@ func (this *Dataset) partitionsBatchRequest(ctx context.Context, items []*pb.Bat
 	errors := make(map[uuid.UUID]error)
 	for i := 0; i < len(partitionItems); i++ {
 		select {
-		case result := <- resultCh:
+		case result := <-resultCh:
 			for id, err := range result {
 				errors[id] = err
 			}
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
 	}
@@ -570,10 +635,10 @@ func (this *Dataset) handlePartitionBatchRequest(ctx context.Context, partition 
 			return
 		}
 
-		resp, err := remoteFn(client, ctx, &pb.PartitionBatchRequest {
-			DatasetId: this.id.Bytes(),
+		resp, err := remoteFn(client, ctx, &pb.PartitionBatchRequest{
+			DatasetId:   this.id.Bytes(),
 			PartitionId: partition.id.Bytes(),
-			Items: items,
+			Items:       items,
 		})
 		if err != nil {
 			resultCh <- this.errorToPartitionBatchResult(items, err)

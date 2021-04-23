@@ -1,11 +1,20 @@
 package index
 
 import (
-	"io";
-	"encoding/binary";
+	"encoding/binary"
+	"io"
 )
 
 type Metadata map[string]string
+
+func (this Metadata) bytesSize() uint64 {
+	var n int = 0
+	for k, v := range this {
+		n += len(k)
+		n += len(v)
+	}
+	return uint64(n)
+}
 
 func (this Metadata) save(w io.Writer) error {
 	if err := binary.Write(w, binary.BigEndian, uint16(len(this))); err != nil {
@@ -28,7 +37,7 @@ func (this Metadata) load(r io.Reader) error {
 		k, v, err := this.loadKV(r)
 		if err != nil {
 			return err
-		}	
+		}
 		this[k] = v
 	}
 	return nil
