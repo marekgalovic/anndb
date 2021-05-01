@@ -1,21 +1,21 @@
 package index
 
 import (
-	"errors";
-	"io";
-	"encoding/binary";
-	"sync/atomic";
-	"unsafe";
+	"encoding/binary"
+	"errors"
+	"io"
+	"sync/atomic"
+	"unsafe"
 
-	"github.com/marekgalovic/anndb/math";
-	"github.com/marekgalovic/anndb/index/space";
+	"github.com/marekgalovic/anndb/index/space"
+	"github.com/marekgalovic/anndb/math"
 
-	"github.com/satori/go.uuid";
+	uuid "github.com/satori/go.uuid"
 )
 
 var (
 	InvalidSpaceTypeErr error = errors.New("Invalid space type")
-	NoEntrypointErr error = errors.New("No entrypoint")
+	NoEntrypointErr     error = errors.New("No entrypoint")
 )
 
 func spaceToSpaceIdx(s space.Space) uint8 {
@@ -67,7 +67,7 @@ func (this *Hnsw) Save(w io.Writer, header bool) error {
 	if _, err := w.Write(entrypoint.id.Bytes()); err != nil {
 		return err
 	}
-	
+
 	// Store vertices
 	for _, verticesShard := range this.vertices {
 		if err := binary.Write(w, binary.BigEndian, uint32(len(verticesShard))); err != nil {
@@ -161,6 +161,7 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 	this.len = 0
 	// Load vertices
 	var shardSize uint32
+	var vertex *hnswVertex
 	for i, _ := range this.vertices {
 		if err := binary.Read(r, binary.BigEndian, &shardSize); err != nil {
 			return err
@@ -182,7 +183,7 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 				return err
 			}
 
-			vector := make(math.Vector, this.size);
+			vector := make(math.Vector, this.size)
 			if err := vector.Load(r); err != nil {
 				return err
 			}
@@ -192,7 +193,9 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 				return err
 			}
 
-			verticesShard[id] = newHnswVertex(id, vector, metadata, int(level))
+			vertex = newHnswVertex(id, vector, metadata, int(level))
+			this.bytesSize += vertex.bytesSize()
+			verticesShard[id] = vertex
 		}
 	}
 
@@ -201,7 +204,6 @@ func (this *Hnsw) Load(r io.Reader, header bool) error {
 	atomic.StorePointer(&this.entrypoint, unsafe.Pointer(s[entrypointId]))
 
 	// Load edges
-	var vertex *hnswVertex
 	for _, verticesShard := range this.vertices {
 		for i := 0; i < len(verticesShard); i++ {
 			if _, err := r.Read(uuidBuf); err != nil {

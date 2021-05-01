@@ -1,13 +1,12 @@
 package index
 
 import (
-	"math/rand";
-    "testing";
-    "sort";
+	"math/rand"
+	"sort"
+	"testing"
 
-    "github.com/stretchr/testify/assert";
-
-    "github.com/satori/go.uuid";
+	uuid "github.com/satori/go.uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSearchResultSort(t *testing.T) {

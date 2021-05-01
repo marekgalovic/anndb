@@ -1,15 +1,13 @@
 package index
 
-import (
-	"github.com/satori/go.uuid";
-)
+import uuid "github.com/satori/go.uuid"
 
 type SearchResult []SearchResultItem
 
 type SearchResultItem struct {
-	Id uuid.UUID
+	Id       uuid.UUID
 	Metadata Metadata
-	Score float32
+	Score    float32
 }
 
 func (this SearchResult) Len() int {
