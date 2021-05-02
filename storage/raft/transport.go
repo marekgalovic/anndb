@@ -1,49 +1,49 @@
 package raft
 
 import (
-	"context";
-	"sync";
-	"errors";
-	"time";
+	"context"
+	"errors"
+	"sync"
+	"time"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/cluster";
+	"github.com/marekgalovic/anndb/cluster"
+	pb "github.com/marekgalovic/anndb/protobuf"
 
-	"github.com/satori/go.uuid";
-	etcdRaft "github.com/coreos/etcd/raft";
-	"github.com/coreos/etcd/raft/raftpb";
-	"github.com/golang/protobuf/proto";
-	log "github.com/sirupsen/logrus";
+	etcdRaft "github.com/coreos/etcd/raft"
+	"github.com/coreos/etcd/raft/raftpb"
+	"github.com/golang/protobuf/proto"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	GroupAlreadyExistsError error = errors.New("Group already exists")
-	GroupNotFoundError error = errors.New("Group not found")
+	GroupNotFoundError      error = errors.New("Group not found")
 )
 
 type RaftTransport struct {
-	nodeId uint64
-	address string
+	nodeId      uint64
+	address     string
 	clusterConn *cluster.Conn
 
-	nodeClients map[uint64]pb.RaftTransportClient
+	nodeClients   map[uint64]pb.RaftTransportClient
 	nodeClientsMu sync.RWMutex
-	groups map[uuid.UUID]*RaftGroup
-	groupsMu sync.RWMutex
+	groups        map[uuid.UUID]*RaftGroup
+	groupsMu      sync.RWMutex
 }
 
 func NewTransport(nodeId uint64, address string, clusterConn *cluster.Conn) *RaftTransport {
 	clusterConn.AddNode(nodeId, address)
 
-	return &RaftTransport {
-		nodeId: nodeId,
-		address: address,
+	return &RaftTransport{
+		nodeId:      nodeId,
+		address:     address,
 		clusterConn: clusterConn,
 
-		nodeClients: make(map[uint64]pb.RaftTransportClient),
+		nodeClients:   make(map[uint64]pb.RaftTransportClient),
 		nodeClientsMu: sync.RWMutex{},
-		groups: make(map[uuid.UUID]*RaftGroup),
-		groupsMu: sync.RWMutex{},
+		groups:        make(map[uuid.UUID]*RaftGroup),
+		groupsMu:      sync.RWMutex{},
 	}
 }
 
@@ -54,7 +54,7 @@ func (this *RaftTransport) NodeId() uint64 {
 func (this *RaftTransport) Address() string {
 	return this.address
 }
- 
+
 func (this *RaftTransport) Receive(ctx context.Context, req *pb.RaftMessage) (*pb.EmptyMessage, error) {
 	groupId, err := uuid.FromBytes(req.GetGroupId())
 	if err != nil {
@@ -94,12 +94,12 @@ func (this *RaftTransport) Send(ctx context.Context, group *RaftGroup, messages 
 			continue
 		}
 
-		payload := &pb.RaftMessage {
+		payload := &pb.RaftMessage{
 			GroupId: group.id.Bytes(),
 			Message: mBytes,
 		}
 
-		sendCtx, _ := context.WithTimeout(ctx, 500 * time.Millisecond)
+		sendCtx, _ := context.WithTimeout(ctx, 500*time.Millisecond)
 		if _, err := client.Receive(sendCtx, payload); err != nil {
 			group.reportUnreachable(m.To)
 			if m.Type == raftpb.MsgSnap {

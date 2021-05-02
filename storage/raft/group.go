@@ -101,9 +101,21 @@ func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *Ra
 		return nil, err
 	}
 
-	go g.run()
-
 	return g, nil
+}
+
+func (this *RaftGroup) Start() error {
+	snap, err := this.wal.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !etcdRaft.IsEmptySnap(snap) {
+		if err := this.processSnapshotFn(snap.Data); err != nil {
+			return err
+		}
+	}
+	go this.run()
+	return nil
 }
 
 func (this *RaftGroup) Stop() {

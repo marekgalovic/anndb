@@ -1,20 +1,20 @@
 package main
 
 import (
-	"fmt";
+	"fmt"
 	// "os";
 	// "bufio";
-	"flag";
-	"time";
-	"context";
-	"io";
+	"context"
+	"flag"
+	"io"
+	"time"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/math"
+	pb "github.com/marekgalovic/anndb/protobuf"
 
-	"github.com/satori/go.uuid";
-	"google.golang.org/grpc";
-	log "github.com/sirupsen/logrus";
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -35,9 +35,9 @@ func main() {
 	search := pb.NewSearchClient(conn)
 
 	sentAt = time.Now()
-	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset {
-		Dimension: 32,
-		PartitionCount: 1,
+	dataset, err := datasetManager.Create(context.Background(), &pb.Dataset{
+		Dimension:         32,
+		PartitionCount:    1,
 		ReplicationFactor: 3,
 	})
 	if err != nil {
@@ -46,11 +46,10 @@ func main() {
 	id := uuid.Must(uuid.FromBytes(dataset.GetId()))
 	log.Info(id, time.Since(sentAt))
 
-
 	time.Sleep(2 * time.Second)
 
 	// log.Info("Press ENTER to delete the dataset.")
-	// bufio.NewReader(os.Stdin).ReadBytes('\n') 
+	// bufio.NewReader(os.Stdin).ReadBytes('\n')
 
 	// sentAt = time.Now()
 	// _, err = datasetManager.Delete(context.Background(), &pb.UUIDRequest {
@@ -62,7 +61,6 @@ func main() {
 	// log.Info(id, time.Since(sentAt))
 	// time.Sleep(100 * time.Millisecond)
 
-	
 	// time.Sleep(1 * time.Second)
 
 	// id := uuid.Must(uuid.FromString("e9e1c34f-fa30-4fa4-aa29-492266ceed6d"))
@@ -77,62 +75,36 @@ func main() {
 	// }
 
 	sentAt = time.Now()
-	n := 1000
-	for i := 0; i < n / 100; i++ {
-		RETRY:
-		batchItems := make([]*pb.BatchItem, 100)
-		for j := 0; j < 100; j++ {
-			batchItems[j] = &pb.BatchItem {
-				Id: uuid.NewV4().Bytes(),
-				Value: math.RandomUniformVector(32),
-				Metadata: map[string]string {
-					"foo": fmt.Sprintf("foo bar baz %d", i * 100 + j),
-				},
-			}
-		}
-
-		resp, err := dataManager.BatchInsert(context.Background(), &pb.BatchRequest {
+	n := 50000
+	for i := 0; i < n; i++ {
+	RETRY:
+		_, err = dataManager.Insert(context.Background(), &pb.InsertRequest{
 			DatasetId: id.Bytes(),
-			Items: batchItems,
+			Id:        uuid.NewV4().Bytes(),
+			Value:     math.RandomUniformVector(32),
+			Metadata: map[string]string{
+				"foo": fmt.Sprintf("foo bar baz %d", i),
+			},
 		})
 		if err != nil {
 			log.Error(err)
 			goto RETRY
 		}
-		for id, errString := range resp.GetErrors() {
-			log.Errorf("ID: %s, Err: %s", id, errString)
-		}
-		if i % 10 == 0 {
+		if i%1000 == 0 {
 			log.Info(i)
 		}
-
-		// _, err = dataManager.Insert(context.Background(), &pb.InsertRequest {
-		// 	DatasetId: id.Bytes(),
-		// 	Id: uint64(i),
-		// 	Value: math.RandomUniformVector(32),
-		// 	Metadata: map[string]string {
-		// 		"foo": fmt.Sprintf("foo bar baz %d", i),
-		// 	},
-		// })
-		// if err != nil {
-		// 	log.Error(err)
-		// 	goto RETRY
-		// }
-		// if i % 1000 == 0 {
-		// 	log.Info(i)
-		// }
 	}
-	log.Infof("Insert %d items: %s, %.2f ops/s", n, time.Since(sentAt), float64(n) / time.Since(sentAt).Seconds())
+	log.Infof("Insert %d items: %s, %.2f ops/s", n, time.Since(sentAt), float64(n)/time.Since(sentAt).Seconds())
 
 	// time.Sleep(1 * time.Second)
 
 	// // id := uuid.Must(uuid.FromString("e935acfe-b17a-494a-b315-365fd4fac11f"))
 
 	sentAt = time.Now()
-	stream, err := search.Search(context.Background(), &pb.SearchRequest {
+	stream, err := search.Search(context.Background(), &pb.SearchRequest{
 		DatasetId: id.Bytes(),
-		Query: math.RandomUniformVector(32),
-		K: 10,
+		Query:     math.RandomUniformVector(32),
+		K:         10,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -160,7 +132,7 @@ func main() {
 	// 	if err != nil {
 	// 		log.Fatal(err)
 	// 	}
-	// 	log.Info(i, time.Since(sentAt))	
+	// 	log.Info(i, time.Since(sentAt))
 	// }
 
 	// sentAt = time.Now()

@@ -1,36 +1,35 @@
 package wal
 
 import (
-	"errors";
-	"math";
-	"encoding/binary";
-	"bytes";
-	"sync";
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"math"
+	"sync"
 
-	"github.com/satori/go.uuid";
-	etcdRaft "github.com/coreos/etcd/raft";
-	"github.com/coreos/etcd/raft/raftpb";
-	badger "github.com/dgraph-io/badger/v2";
-	log "github.com/sirupsen/logrus";
+	etcdRaft "github.com/coreos/etcd/raft"
+	"github.com/coreos/etcd/raft/raftpb"
+	badger "github.com/dgraph-io/badger/v2"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
-
 var (
-	badgerRaftIdKey []byte = []byte("raftid")
-	cacheSnapshotKey string = "snapshot"
+	badgerRaftIdKey    []byte = []byte("raftid")
+	cacheSnapshotKey   string = "snapshot"
 	cacheFirstIndexKey string = "firstindex"
-	cacheLastIndexKey string = "lastindex"
+	cacheLastIndexKey  string = "lastindex"
 )
 
 var (
-	entryNotFoundErr error = errors.New("Entry not found")
+	entryNotFoundErr  error = errors.New("Entry not found")
 	EmptyConfStateErr error = errors.New("Empty ConfState")
 )
 
 type badgerWAL struct {
 	groupId uuid.UUID
-	db *badger.DB
-	cache *sync.Map
+	db      *badger.DB
+	cache   *sync.Map
 }
 
 func GetBadgerRaftId(db *badger.DB) (uint64, error) {
@@ -55,16 +54,16 @@ func SetBadgerRaftId(db *badger.DB, id uint64) error {
 		binary.BigEndian.PutUint64(b[:], id)
 		return txn.Set(badgerRaftIdKey, b[:])
 	})
-} 
+}
 
 func NewBadgerWAL(db *badger.DB, groupId uuid.UUID) *badgerWAL {
 	wal := &badgerWAL{
 		groupId: groupId,
-		db: db,
-		cache: new(sync.Map),
+		db:      db,
+		cache:   new(sync.Map),
 	}
 
-	_, err := wal.FirstIndex();
+	_, err := wal.FirstIndex()
 	if err == entryNotFoundErr {
 		// Empty WAL. Populate with a dummy entry at term 0.
 		wal.reset(make([]raftpb.Entry, 1))
@@ -83,7 +82,7 @@ func (this *badgerWAL) InitialState() (raftpb.HardState, raftpb.ConfState, error
 
 	snapshot, err := this.Snapshot()
 	if err != nil {
-		return hardState, raftpb.ConfState{}, err	
+		return hardState, raftpb.ConfState{}, err
 	}
 
 	return hardState, snapshot.Metadata.ConfState, nil
@@ -102,7 +101,7 @@ func (this *badgerWAL) Entries(lo, hi, maxSize uint64) ([]raftpb.Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	if hi > lastIndex + 1 {
+	if hi > lastIndex+1 {
 		return nil, etcdRaft.ErrUnavailable
 	}
 
@@ -114,7 +113,7 @@ func (this *badgerWAL) Term(idx uint64) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if idx < firstIndex - 1 {
+	if idx < firstIndex-1 {
 		return 0, etcdRaft.ErrCompacted
 	}
 
@@ -158,7 +157,7 @@ func (this *badgerWAL) FirstIndex() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	this.cache.Store(cacheFirstIndexKey, index + 1)
+	this.cache.Store(cacheFirstIndexKey, index+1)
 	return index + 1, nil
 }
 
@@ -246,7 +245,7 @@ func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, d
 	if idx != entry.Index {
 		return snapshot, entryNotFoundErr
 	}
-	
+
 	snapshot.Metadata.Index = entry.Index
 	snapshot.Metadata.Term = entry.Term
 	if confState != nil {
@@ -268,7 +267,7 @@ func (this *badgerWAL) CreateSnapshot(idx uint64, confState *raftpb.ConfState, d
 }
 
 func (this *badgerWAL) DeleteGroup() error {
-	return this.reset(nil)	
+	return this.reset(nil)
 }
 
 func (this *badgerWAL) entryPrefix() []byte {
@@ -302,7 +301,7 @@ func (this *badgerWAL) parseIndex(key []byte) uint64 {
 
 func (this *badgerWAL) seekEntry(entry *raftpb.Entry, seekTo uint64, reverse bool) (uint64, error) {
 	var index uint64
-	err := this.db.View(func (txn *badger.Txn) error {
+	err := this.db.View(func(txn *badger.Txn) error {
 		iterOpt := badger.DefaultIteratorOptions
 		iterOpt.PrefetchValues = false
 		iterOpt.Prefix = this.entryPrefix()
@@ -331,7 +330,7 @@ func (this *badgerWAL) seekEntry(entry *raftpb.Entry, seekTo uint64, reverse boo
 func (this *badgerWAL) getEntries(lo, hi, maxSize uint64) ([]raftpb.Entry, error) {
 	var entries []raftpb.Entry
 	err := this.db.View(func(txn *badger.Txn) error {
-		if hi - lo == 1 {
+		if hi-lo == 1 {
 			item, err := txn.Get(this.entryKey(lo))
 			if err != nil {
 				return err
@@ -395,7 +394,7 @@ func (this *badgerWAL) writeEntries(batch *badger.WriteBatch, entries []raftpb.E
 		return err
 	}
 	firstEntryIndex := entries[0].Index
-	if firstEntryIndex + uint64(len(entries)) - 1 < firstIndex {
+	if firstEntryIndex+uint64(len(entries))-1 < firstIndex {
 		return nil
 	}
 	if firstIndex > firstEntryIndex {
@@ -421,7 +420,7 @@ func (this *badgerWAL) writeEntries(batch *badger.WriteBatch, entries []raftpb.E
 	lastEntryIndex := entries[len(entries)-1].Index
 	this.cache.Store(cacheLastIndexKey, lastEntryIndex)
 	if lastIndex > lastEntryIndex {
-		return this.deleteEntriesFromIndex(batch, lastEntryIndex + 1)
+		return this.deleteEntriesFromIndex(batch, lastEntryIndex+1)
 	}
 	return nil
 }
@@ -476,7 +475,7 @@ func (this *badgerWAL) writeSnapshot(batch *badger.WriteBatch, snapshot raftpb.S
 
 func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx uint64) error {
 	var keys []string
-	err := this.db.View(func (txn *badger.Txn) error {
+	err := this.db.View(func(txn *badger.Txn) error {
 		startKey := this.entryKey(fromIdx)
 
 		iterOpt := badger.DefaultIteratorOptions
@@ -502,7 +501,7 @@ func (this *badgerWAL) deleteEntriesFromIndex(batch *badger.WriteBatch, fromIdx 
 func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilIdx uint64) error {
 	var keys []string
 	var index uint64
-	err := this.db.View(func (txn *badger.Txn) error {
+	err := this.db.View(func(txn *badger.Txn) error {
 		iterOpt := badger.DefaultIteratorOptions
 		iterOpt.PrefetchValues = false
 		iterOpt.Prefix = this.entryPrefix()
@@ -538,7 +537,7 @@ func (this *badgerWAL) deleteEntriesUntilIndex(batch *badger.WriteBatch, untilId
 
 	if v, ok := this.cache.Load(cacheFirstIndexKey); ok {
 		if v.(uint64) <= untilIdx {
-			this.cache.Store(cacheFirstIndexKey, untilIdx + 1)
+			this.cache.Store(cacheFirstIndexKey, untilIdx+1)
 		}
 	}
 	return nil

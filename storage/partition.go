@@ -119,6 +119,9 @@ func (this *partition) loadRaft(nodeIds []uint64) error {
 	if err := this.raft.RegisterSnapshotFn(this.snapshot); err != nil {
 		return err
 	}
+	if err := this.raft.Start(); err != nil {
+		return err
+	}
 
 	this.log.Info("Loaded Raft")
 	return nil

@@ -1,41 +1,41 @@
 package anndb
 
 import (
-	"net";
-	"path";
-	"context";
-	"time";
-	"errors";
+	"context"
+	"errors"
+	"net"
+	"path"
+	"time"
 
-	pb "github.com/marekgalovic/anndb/protobuf";
-	"github.com/marekgalovic/anndb/cluster";
-	"github.com/marekgalovic/anndb/storage/raft";
-	"github.com/marekgalovic/anndb/storage/wal";
-	"github.com/marekgalovic/anndb/storage";
-	"github.com/marekgalovic/anndb/services";
+	"github.com/marekgalovic/anndb/cluster"
+	pb "github.com/marekgalovic/anndb/protobuf"
+	"github.com/marekgalovic/anndb/services"
+	"github.com/marekgalovic/anndb/storage"
+	"github.com/marekgalovic/anndb/storage/raft"
+	"github.com/marekgalovic/anndb/storage/wal"
 
-	"github.com/satori/go.uuid";
-	"google.golang.org/grpc";
-	"google.golang.org/grpc/credentials";
 	badger "github.com/dgraph-io/badger/v2"
-	log "github.com/sirupsen/logrus";
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type Server struct {
 	config *Config
 
-	db *badger.DB
-	clusterConn *cluster.Conn
-	allocator *storage.Allocator
-	zeroGroup *raft.RaftGroup
+	db             *badger.DB
+	clusterConn    *cluster.Conn
+	allocator      *storage.Allocator
+	zeroGroup      *raft.RaftGroup
 	datasetManager *storage.DatasetManager
-	nodesManager *raft.NodesManager
-	grpcServer *grpc.Server
-	listener net.Listener
+	nodesManager   *raft.NodesManager
+	grpcServer     *grpc.Server
+	listener       net.Listener
 }
 
 func NewServer(config *Config) *Server {
-	return &Server {
+	return &Server{
 		config: config,
 	}
 }
@@ -86,7 +86,7 @@ func (this *Server) setup() error {
 		return err
 	}
 
-	this.allocator = storage.NewAllocator(this.clusterConn) 
+	this.allocator = storage.NewAllocator(this.clusterConn)
 
 	raftTransport := raft.NewTransport(this.config.RaftNodeId, net.JoinHostPort("", this.config.Port), this.clusterConn)
 
@@ -95,10 +95,14 @@ func (this *Server) setup() error {
 	if err != nil {
 		return err
 	}
- 
+
 	// Create shared raft group on top of the zero group
 	sharedGroup, err := raft.NewSharedGroup(this.zeroGroup)
 	if err != nil {
+		return err
+	}
+
+	if err := this.zeroGroup.Start(); err != nil {
 		return err
 	}
 
