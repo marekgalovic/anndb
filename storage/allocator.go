@@ -1,16 +1,16 @@
 package storage
 
 import (
-	"context";
-	"math/rand";
-	"sync";
-	"errors";
+	"context"
+	"errors"
+	"math/rand"
+	"sync"
 
-	"github.com/marekgalovic/anndb/cluster";
-	"github.com/marekgalovic/anndb/math";
+	"github.com/marekgalovic/anndb/cluster"
+	"github.com/marekgalovic/anndb/math"
+	uuid "github.com/satori/go.uuid"
 
-	"github.com/satori/go.uuid";
-	log "github.com/sirupsen/logrus";
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,12 +18,12 @@ var (
 )
 
 type Allocator struct {
-	ctx context.Context
-	cancelCtx context.CancelFunc
+	ctx         context.Context
+	cancelCtx   context.CancelFunc
 	clusterConn *cluster.Conn
 
-	updatesC chan interface{}
-	partitions map[uuid.UUID]*partition
+	updatesC     chan interface{}
+	partitions   map[uuid.UUID]*partition
 	partitionsMu *sync.RWMutex
 }
 
@@ -38,13 +38,13 @@ type unwatchPartitionUpdate struct {
 func NewAllocator(clusterConn *cluster.Conn) *Allocator {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	a := &Allocator {
-		ctx: ctx,
-		cancelCtx: cancelCtx,
+	a := &Allocator{
+		ctx:         ctx,
+		cancelCtx:   cancelCtx,
 		clusterConn: clusterConn,
 
-		updatesC: make(chan interface{}),
-		partitions: make(map[uuid.UUID]*partition),
+		updatesC:     make(chan interface{}),
+		partitions:   make(map[uuid.UUID]*partition),
 		partitionsMu: &sync.RWMutex{},
 	}
 
@@ -95,7 +95,7 @@ func (this *Allocator) getPartitionsNodeIds(partitionCount uint, replicationFact
 		rand.Shuffle(len(nodeIds), func(i, j int) {
 			nodeIds[i], nodeIds[j] = nodeIds[j], nodeIds[i]
 		})
-		
+
 		partitionsNodeIds[i] = nodeIds[:math.MinInt(len(nodeIds), int(replicationFactor))]
 	}
 
@@ -107,7 +107,7 @@ func (this *Allocator) run() {
 
 	for {
 		select {
-		case change := <- nodeChanges:
+		case change := <-nodeChanges:
 			if change == nil {
 				continue
 			}
@@ -117,7 +117,7 @@ func (this *Allocator) run() {
 			case cluster.NodesChangeRemoveNode:
 				this.removeNodeFromPartitions(change.NodeId)
 			}
-		case update := <- this.updatesC:
+		case update := <-this.updatesC:
 			if update == nil {
 				continue
 			}
@@ -128,7 +128,7 @@ func (this *Allocator) run() {
 					func(partition *partition) {
 						defer func() {
 							if r := recover(); r != nil {
-								log.WithFields(log.Fields{"partition-id": partition.id}).Errorf("Partition loadRaft panicked.")
+								log.WithFields(log.Fields{"partition-id": partition.id, "dataset-id": partition.dataset.id}).Errorf("Partition loadRaft panicked: %v", r)
 							}
 						}()
 						partition.loadRaft(partition.nodeIds())
@@ -140,14 +140,14 @@ func (this *Allocator) run() {
 					func(partition *partition) {
 						defer func() {
 							if r := recover(); r != nil {
-								log.WithFields(log.Fields{"partition-id": partition.id}).Errorf("Partition unloadRaft panicked.")
+								log.WithFields(log.Fields{"partition-id": partition.id, "dataset-id": partition.dataset.id}).Errorf("Partition unloadRaft panicked: %v", r)
 							}
 						}()
-						partition.unloadRaft()	
+						partition.unloadRaft()
 					}(_partition)
 				}
 			}
-		case <- this.ctx.Done():
+		case <-this.ctx.Done():
 			return
 		}
 	}
