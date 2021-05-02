@@ -9,6 +9,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+const HNSW_VERTEX_EDGE_BYTES = 8 + 4
+const HNSW_VERTEX_MUTEX_BYTES = 24
+
 type hnswEdgeSet map[*hnswVertex]float32
 
 type hnswVertex struct {

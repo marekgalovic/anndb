@@ -1,24 +1,24 @@
 package raft
 
 import (
-	"fmt";
-	"context";
-	"time";
+	"context"
 	"errors"
-	"sync/atomic";
+	"fmt"
+	"sync/atomic"
+	"time"
 
-	"github.com/marekgalovic/anndb/storage/wal";
+	"github.com/marekgalovic/anndb/storage/wal"
 
-	"github.com/satori/go.uuid";
-	etcdRaft "github.com/coreos/etcd/raft";
-	"github.com/coreos/etcd/raft/raftpb";
-	log "github.com/sirupsen/logrus";
+	etcdRaft "github.com/coreos/etcd/raft"
+	"github.com/coreos/etcd/raft/raftpb"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 const snapshotOffset uint64 = 5000
 
 var (
-	ProcessFnAlreadyRegisteredErr error = errors.New("ProcessFn already registered")
+	ProcessFnAlreadyRegisteredErr  error = errors.New("ProcessFn already registered")
 	SnapshotFnAlreadyRegisteredErr error = errors.New("SnapshotFn already registered")
 )
 
@@ -34,30 +34,30 @@ type ProcessFn func([]byte) error
 type SnapshotFn func() ([]byte, error)
 
 type RaftGroup struct {
-	id uuid.UUID
-	transport *RaftTransport
-	ctx context.Context
-	ctxCancel context.CancelFunc
-	processFn ProcessFn
+	id                uuid.UUID
+	transport         *RaftTransport
+	ctx               context.Context
+	ctxCancel         context.CancelFunc
+	processFn         ProcessFn
 	processSnapshotFn ProcessFn
-	snapshotFn SnapshotFn
+	snapshotFn        SnapshotFn
 
-	raft etcdRaft.Node
+	raft          etcdRaft.Node
 	raftConfState *raftpb.ConfState
-	raftLeaderId uint64
-	wal wal.WAL
-	log *log.Entry
+	raftLeaderId  uint64
+	wal           wal.WAL
+	log           *log.Entry
 }
 
 func startRaftNode(id uint64, nodeIds []uint64, storage wal.WAL, logger *log.Entry) (etcdRaft.Node, error) {
-	raftConfig := &etcdRaft.Config {
-	    ID: id,
-	    ElectionTick: 10,
-	    HeartbeatTick: 1,
-	    Storage: storage,
-	    MaxSizePerMsg: 4096,
-	    MaxInflightMsgs: 256,
-	    Logger: logger,
+	raftConfig := &etcdRaft.Config{
+		ID:              id,
+		ElectionTick:    10,
+		HeartbeatTick:   1,
+		Storage:         storage,
+		MaxSizePerMsg:   4096,
+		MaxInflightMsgs: 256,
+		Logger:          logger,
 	}
 
 	if len(nodeIds) > 0 {
@@ -74,9 +74,9 @@ func startRaftNode(id uint64, nodeIds []uint64, storage wal.WAL, logger *log.Ent
 
 func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *RaftTransport) (*RaftGroup, error) {
 	logger := log.WithFields(log.Fields{
-    	"node_id": fmt.Sprintf("%16x", transport.nodeId),
-    	"group_id": id.String(),
-    })
+		"node_id":  fmt.Sprintf("%16x", transport.nodeId),
+		"group_id": id.String(),
+	})
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	raftNode, err := startRaftNode(transport.NodeId(), nodeIds, storage, logger)
@@ -84,17 +84,17 @@ func NewRaftGroup(id uuid.UUID, nodeIds []uint64, storage wal.WAL, transport *Ra
 		return nil, err
 	}
 
-	g := &RaftGroup {
-		id: id,
-		transport: transport,
-		ctx: ctx,
-		ctxCancel: ctxCancel,
-		processFn: nil,
+	g := &RaftGroup{
+		id:                id,
+		transport:         transport,
+		ctx:               ctx,
+		ctxCancel:         ctxCancel,
+		processFn:         nil,
 		processSnapshotFn: nil,
-		snapshotFn: nil,
-		raft: raftNode,
-		wal: storage,
-		log: logger,
+		snapshotFn:        nil,
+		raft:              raftNode,
+		wal:               storage,
+		log:               logger,
 	}
 
 	if err := transport.addGroup(g); err != nil {
@@ -174,14 +174,14 @@ func (this *RaftGroup) run() {
 	var lastAppliedIdx uint64 = 0
 	for {
 		select {
-		case <- snapshotTicker.C:
+		case <-snapshotTicker.C:
 			if err := this.trySnapshot(lastAppliedIdx, snapshotOffset); err != nil {
 				this.log.Errorf("Snapshot failed: %v", err)
 				continue
 			}
-		case <- ticker.C:
+		case <-ticker.C:
 			this.raft.Tick()
-		case rd := <- this.raft.Ready():
+		case rd := <-this.raft.Ready():
 			if rd.SoftState != nil {
 				this.raftLeaderId = atomic.LoadUint64(&rd.SoftState.Lead)
 			}
@@ -192,6 +192,7 @@ func (this *RaftGroup) run() {
 				this.log.Fatal(err)
 			}
 			if !etcdRaft.IsEmptySnap(rd.Snapshot) {
+				this.log.Info("Process snapshot")
 				if err := this.processSnapshotFn(rd.Snapshot.Data); err != nil {
 					this.log.Fatal(err)
 				}
@@ -215,7 +216,7 @@ func (this *RaftGroup) run() {
 				this.transport.Send(this.ctx, this, rd.Messages)
 			}
 			this.raft.Advance()
-		case <- this.ctx.Done():
+		case <-this.ctx.Done():
 			this.log.Info("Stop Raft")
 			return
 		}
@@ -268,7 +269,7 @@ func (this *RaftGroup) trySnapshot(lastCommittedIdx, skip uint64) error {
 	if err != nil {
 		return err
 	}
-	if lastCommittedIdx <= existing.Metadata.Index + skip {
+	if lastCommittedIdx <= existing.Metadata.Index+skip {
 		// Not enough new log entries to create snapshot
 		return nil
 	}

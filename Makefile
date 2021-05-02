@@ -35,3 +35,6 @@ run_clean_no_join: compile
 
 run: compile
 	./bin/anndb-darwin-amd64-$(VERSION) --port="600${ID}" --join="${JOIN}" --data-dir="./data/${ID}"
+
+test:
+	go test ./...

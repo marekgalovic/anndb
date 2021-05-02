@@ -72,6 +72,7 @@ func newPartition(id uuid.UUID, meta *pb.Partition, dataset *Dataset, raftWalDB 
 		raftMu:         &sync.RWMutex{},
 		notificator:    utils.NewNotificator(),
 		log: log.WithFields(log.Fields{
+			"dataset_id":   dataset.id,
 			"partition_id": id,
 		}),
 	}
@@ -470,7 +471,11 @@ func (this *partition) process(data []byte) error {
 }
 
 func (this *partition) processSnapshot(data []byte) error {
-	return this.index.Load(bytes.NewBuffer(data), false)
+	err := this.index.Load(bytes.NewBuffer(data), false)
+	if err == nil {
+		this.log.Infof("Loaded index from snapshot. Index size: %d", this.index.Len())
+	}
+	return err
 }
 
 func (this *partition) snapshot() ([]byte, error) {
@@ -478,6 +483,8 @@ func (this *partition) snapshot() ([]byte, error) {
 	if err := this.index.Save(&buf, false); err != nil {
 		return nil, err
 	}
+	this.log.Infof("Created snapshot. Index size: %d", this.index.Len())
+
 	return buf.Bytes(), nil
 }
 

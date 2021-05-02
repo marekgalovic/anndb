@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goMath "math"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -61,7 +62,19 @@ func (this *Hnsw) Len() int {
 }
 
 func (this *Hnsw) BytesSize() uint64 {
-	return atomic.LoadUint64(&this.bytesSize)
+	maxLevel := 10
+	if entrypoint := (*hnswVertex)(atomic.LoadPointer(&this.entrypoint)); entrypoint != nil {
+		maxLevel = entrypoint.level
+	}
+
+	mutb := float64(HNSW_VERTEX_MUTEX_BYTES)
+	var pointersSize float64 = float64(this.config.mMax0*HNSW_VERTEX_EDGE_BYTES) + mutb
+	for i := 1; i < maxLevel; i++ {
+		pointersSize += (float64(this.config.mMax*HNSW_VERTEX_EDGE_BYTES) + mutb) * goMath.Exp(float64(i)/-float64(this.config.levelMultiplier))
+	}
+
+	verticesDataSize := atomic.LoadUint64(&this.bytesSize)
+	return uint64(goMath.Floor(float64(this.Len())*pointersSize)) + verticesDataSize
 }
 
 func (this *Hnsw) Insert(id uuid.UUID, value math.Vector, metadata Metadata, vertexLevel int) error {

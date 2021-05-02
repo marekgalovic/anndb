@@ -128,7 +128,7 @@ func (this *Allocator) run() {
 					func(partition *partition) {
 						defer func() {
 							if r := recover(); r != nil {
-								log.WithFields(log.Fields{"partition-id": partition.id, "dataset-id": partition.dataset.id}).Errorf("Partition loadRaft panicked: %v", r)
+								log.WithFields(log.Fields{"partition_id": partition.id, "dataset_id": partition.dataset.id}).Errorf("Partition loadRaft panicked: %v", r)
 							}
 						}()
 						partition.loadRaft(partition.nodeIds())
@@ -140,7 +140,7 @@ func (this *Allocator) run() {
 					func(partition *partition) {
 						defer func() {
 							if r := recover(); r != nil {
-								log.WithFields(log.Fields{"partition-id": partition.id, "dataset-id": partition.dataset.id}).Errorf("Partition unloadRaft panicked: %v", r)
+								log.WithFields(log.Fields{"partition_id": partition.id, "dataset_id": partition.dataset.id}).Errorf("Partition unloadRaft panicked: %v", r)
 							}
 						}()
 						partition.unloadRaft()
