@@ -1,4 +1,7 @@
-# AnnDB [![CircleCI](https://circleci.com/gh/marekgalovic/anndb/tree/master.svg?style=svg&circle-token=947f9407a37356c6fe661af956554012b3e456c5)](https://circleci.com/gh/marekgalovic/anndb/tree/master)
+> [!WARNING]  
+> **This project is no longer maintained.** If you are looking for a production-ready vector database, check out **[TopK](https://github.com/topk-io/topk)**.
+
+# AnnDB
 AnnDB is a horizontally scalable and distributed approximate nearest neighbors database. It is build from the ground up to scale to millions of high-dimensional vectors while providing low latency and high throughput.
 
 ## Install
